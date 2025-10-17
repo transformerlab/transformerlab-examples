@@ -112,6 +112,16 @@ def main():
         type=str,
         default=None,
         help="Output directory for checkpoints")
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=500,
+        help="Save checkpoints every N steps (default: 500)")
+    parser.add_argument(
+        "--max_steps",
+        type=int,
+        default=None,
+        help="Maximum number of training steps (overrides epochs if set)")
     args = parser.parse_args()
     
     try:
@@ -236,12 +246,16 @@ def main():
         lr_scheduler_kwargs={"min_lr_rate": 0.1},
         dataset_num_proc=num_proc,
         save_strategy="steps",
-        save_steps=500,
+        save_steps=args.save_steps,
         save_total_limit=3,
     )
     
+    if args.max_steps is not None:
+        training_args.max_steps = args.max_steps
+    
     # Calculate total training steps for progress tracking
-    total_steps = (len(train_dataset) // (args.per_device_train_batch_size * args.gradient_accumulation_steps)) * args.num_train_epochs
+    calculated_steps = (len(train_dataset) // (args.per_device_train_batch_size * args.gradient_accumulation_steps)) * args.num_train_epochs
+    total_steps = args.max_steps if args.max_steps is not None else calculated_steps
     lab.log(f"Total training steps: {total_steps}")
     
     # Create TransformerLab callback for progress tracking

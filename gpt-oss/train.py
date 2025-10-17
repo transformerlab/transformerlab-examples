@@ -110,7 +110,7 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=None,
+        default="./output",
         help="Output directory for checkpoints")
     parser.add_argument(
         "--save_steps",
@@ -150,7 +150,8 @@ def main():
         # Log start time
         start_time = datetime.now()
         lab.log(f"Training started at {start_time}")
-    
+        os.makedirs(args.output_dir, exist_ok=True)
+
     except Exception as e:
         # If SDK initialization fails, continue without it
         print(f"Warning: TransformerLab SDK initialization failed: {e}")
@@ -229,8 +230,6 @@ def main():
         model.print_trainable_parameters()
 
     # Prepare training configuration
-    output_dir = args.output_dir or f"{model_id}-checkpoint"
-    os.makedirs(output_dir, exist_ok=True)
     lab.log(f"Output directory: {output_dir}")
     
     training_args = SFTConfig(
@@ -305,7 +304,7 @@ def main():
         "status": "success",
         "job_id": lab.job.id if hasattr(lab.job, 'id') else None,
         "duration": str(training_duration),
-        "output_dir": final_model_path,
+        "output_dir": final_model_dir,
     }
 
 

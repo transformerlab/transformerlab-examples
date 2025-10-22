@@ -122,6 +122,16 @@ def main():
         type=int,
         default=None,
         help="Maximum number of training steps (overrides epochs if set)")
+    parser.add_argument(
+        "--resume_from_checkpoint",
+        type=str,
+        default=None,
+        help="Path to checkpoint to resume training from")
+    parser.add_argument(
+        "--parent_job_id",
+        type=str,
+        default=None,
+        help="Parent job ID when resuming from checkpoint")
     args = parser.parse_args()
     
     try:
@@ -229,11 +239,23 @@ def main():
         model = get_peft_model(model, peft_config)
         model.print_trainable_parameters()
 
+    # Handle checkpoint resumption
+    resume_from_checkpoint = None
+    if args.resume_from_checkpoint:
+        lab.log(f"Resuming training from checkpoint: {args.resume_from_checkpoint}")
+        if os.path.exists(args.resume_from_checkpoint):
+            resume_from_checkpoint = args.resume_from_checkpoint
+            if args.parent_job_id:
+                lab.log(f"Parent job ID: {args.parent_job_id}")
+                lab.job.update_job_data_field("parent_job_id", args.parent_job_id)
+        else:
+            lab.log(f"Warning: Checkpoint path does not exist: {args.resume_from_checkpoint}")
+
     # Prepare training configuration
-    lab.log(f"Output directory: {output_dir}")
+    lab.log(f"Output directory: {args.output_dir}")
     
     training_args = SFTConfig(
-        output_dir=output_dir,
+        output_dir=args.output_dir,
         learning_rate=args.learning_rate,
         num_train_epochs=args.num_train_epochs,
         logging_steps=1,
@@ -274,10 +296,10 @@ def main():
         with accelerator.profile() as prof:
             trainer_kwargs['accelerator_profiler'] = prof
             trainer = ProfilingSFTTrainer(**trainer_kwargs)
-            trainer.train()
+            trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     else:
         trainer = ProfilingSFTTrainer(**trainer_kwargs)
-        trainer.train()
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
     
     # Training completed
     end_time = datetime.now()

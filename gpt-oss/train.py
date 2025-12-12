@@ -110,8 +110,18 @@ def main():
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=None,
+        default="./output",
         help="Output directory for checkpoints")
+    parser.add_argument(
+        "--save_steps",
+        type=int,
+        default=500,
+        help="Save checkpoints every N steps (default: 500)")
+    parser.add_argument(
+        "--max_steps",
+        type=int,
+        default=None,
+        help="Maximum number of training steps (overrides epochs if set)")
     args = parser.parse_args()
     
     try:
@@ -140,7 +150,8 @@ def main():
         # Log start time
         start_time = datetime.now()
         lab.log(f"Training started at {start_time}")
-    
+        os.makedirs(args.output_dir, exist_ok=True)
+
     except Exception as e:
         # If SDK initialization fails, continue without it
         print(f"Warning: TransformerLab SDK initialization failed: {e}")
@@ -219,8 +230,6 @@ def main():
         model.print_trainable_parameters()
 
     # Prepare training configuration
-    output_dir = args.output_dir or f"{model_id}-checkpoint"
-    os.makedirs(output_dir, exist_ok=True)
     lab.log(f"Output directory: {output_dir}")
     
     training_args = SFTConfig(
@@ -236,12 +245,16 @@ def main():
         lr_scheduler_kwargs={"min_lr_rate": 0.1},
         dataset_num_proc=num_proc,
         save_strategy="steps",
-        save_steps=500,
+        save_steps=args.save_steps,
         save_total_limit=3,
     )
     
+    if args.max_steps is not None:
+        training_args.max_steps = args.max_steps
+    
     # Calculate total training steps for progress tracking
-    total_steps = (len(train_dataset) // (args.per_device_train_batch_size * args.gradient_accumulation_steps)) * args.num_train_epochs
+    calculated_steps = (len(train_dataset) // (args.per_device_train_batch_size * args.gradient_accumulation_steps)) * args.num_train_epochs
+    total_steps = args.max_steps if args.max_steps is not None else calculated_steps
     lab.log(f"Total training steps: {total_steps}")
     
     # Create TransformerLab callback for progress tracking
@@ -291,7 +304,7 @@ def main():
         "status": "success",
         "job_id": lab.job.id if hasattr(lab.job, 'id') else None,
         "duration": str(training_duration),
-        "output_dir": final_model_path,
+        "output_dir": final_model_dir,
     }
 
 

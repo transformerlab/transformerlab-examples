@@ -1,0 +1,13 @@
+{
+  "title": "Fake Train Task",
+  "name": "fake-task",
+  "command": "python ~/new-task-test/train.py",
+  "cpus": "2",
+  "memory": "4",
+  "setup": "uv pip install transformerlab wandb",
+  "env_vars": {
+    "WANDB_PROJECT": "my-training-project",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "description": "A fake task to support new things"
+}

@@ -44,9 +44,10 @@ def _write_autotrain_config(config_path: str, training_config: dict, quick_test:
         data:
           path: {dataset_name}
           train_split: train
-          valid_split: validation
+          valid_split: null
+          chat_template: tokenizer
           column_mapping:
-            text_column: text
+            text_column: messages
 
         params:
           block_size: 1024
@@ -84,11 +85,11 @@ def train_with_autotrain(quick_test: bool = True):
     os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 
     training_config = {
-        "experiment_name": "autotrain-llama32-sft",
-        "model_name": "meta-llama/Llama-3.2-1B-Instruct",
-        "dataset": "Trelis/touch-rugby-rules",
+        "experiment_name": "autotrain-dialogpt-sft",
+        "model_name": "microsoft/DialoGPT-small",
+        "dataset": "HuggingFaceH4/no_robots",
         "template_name": "autotrain-llm-sft-demo",
-        "project_name": "llama32-touch-rugby-sft",
+        "project_name": "dialogpt-no-robots-sft",
         "output_dir": "./autotrain_output",
         "quick_test": quick_test,
         "_config": {
@@ -115,6 +116,17 @@ def train_with_autotrain(quick_test: bool = True):
         # Optionally hint about HF auth
         if not os.getenv("HF_TOKEN"):
             lab.log("⚠️ HF_TOKEN not set; ensure AutoTrain is authenticated with Hugging Face.")
+        else:
+            # Authenticate with Hugging Face
+            lab.log("🔐 Authenticating with Hugging Face...")
+            auth_cmd = ["huggingface-cli", "login", "--token", os.getenv("HF_TOKEN")]
+            try:
+                subprocess.run(auth_cmd, check=True, capture_output=True, text=True)
+                lab.log("✅ Hugging Face authentication successful.")
+            except subprocess.CalledProcessError as e:
+                lab.log(f"❌ Hugging Face authentication failed: {e}")
+                lab.finish("Authentication failed")
+                return {"status": "error", "error": "HF auth failed"}
 
         # Write AutoTrain config YAML into the output directory
         autotrain_config_path = os.path.join(training_config["output_dir"], "autotrain_llm_sft.yaml")
@@ -129,8 +141,8 @@ def train_with_autotrain(quick_test: bool = True):
         lab.log(f"Saved AutoTrain config artifact: {config_artifact_path}")
 
         # Run the AutoTrain CLI. For autotrain-advanced the pattern is:
-        #   autotrain llm --config <config_path>
-        cmd = ["autotrain", "llm", "--config", autotrain_config_path]
+        #   autotrain --config <config_path>
+        cmd = ["autotrain", "--config", autotrain_config_path]
         lab.log(f"🚀 Launching AutoTrain via CLI: {' '.join(cmd)}")
 
         try:

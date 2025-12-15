@@ -8,7 +8,7 @@ while reporting progress, logs, and artifacts via the `lab` facade.
 
 Notes:
 - This example assumes the `autotrain` CLI from `autotrain-advanced` is installed
-  and on PATH (e.g. `pip install \"autotrain-advanced[llm]\"`).
+  and on PATH (e.g. `pip install autotrain-advanced`).
 - It also assumes you have a valid Hugging Face token in `HF_TOKEN` and that
   AutoTrain can use it (typically via `huggingface-cli login` or env vars).
 """
@@ -128,8 +128,9 @@ def train_with_autotrain(quick_test: bool = True):
         config_artifact_path = lab.save_artifact(autotrain_config_path, "autotrain_llm_sft.yaml")
         lab.log(f"Saved AutoTrain config artifact: {config_artifact_path}")
 
-        # Run the AutoTrain CLI
-        cmd = ["autotrain", autotrain_config_path]
+        # Run the AutoTrain CLI. For autotrain-advanced the pattern is:
+        #   autotrain llm --config <config_path>
+        cmd = ["autotrain", "llm", "--config", autotrain_config_path]
         lab.log(f"🚀 Launching AutoTrain via CLI: {' '.join(cmd)}")
 
         try:

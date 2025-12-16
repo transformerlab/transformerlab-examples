@@ -1,7 +1,7 @@
 {
   "title": "AutoTrain SFT Training Task",
   "name": "autotrain-sft-task",
-  "command": "python ~/autotrain-sft/autotrain_sft_train.py",
+  "command": "cd ~/autotrain-sft && python train.py",
   "cpus": "2",
   "memory": "4",
   "accelerators": "RTX3090:1",

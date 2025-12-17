@@ -1,0 +1,16 @@
+{
+  "title": "Stable Diffusion LoRA Training",
+  "name": "sd-lora-train-task",
+  "command": "cd ~/sd-lora-train && python train_sd.py",
+  "cpus": "4",
+  "memory": "16",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install diffusers[torch] transformers accelerate peft bitsandbytes datasets torchvision wandb",
+  "env_vars": {
+    "WANDB_PROJECT": "sd-lora-training",
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
+    "MODEL_NAME": "runwayml/stable-diffusion-v1-5"
+  },
+  "description": "Fine-tune Stable Diffusion using LoRA (Low-Rank Adaptation) via Hugging Face Diffusers and PEFT. Generates a dummy dataset for demonstration if none is provided."
+}

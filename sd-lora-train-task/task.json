@@ -11,7 +11,7 @@
     "PYTHONUNBUFFERED": "1",
     "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
     "MODEL_NAME": "stabilityai/stable-diffusion-xl-base-1.0",
-    "DATASET_URL": "https://huggingface.co/datasets/Norod78/simpsons-blip-captions/resolve/main/data/train-00000-of-00001.parquet"
+    "DATASET_URL": "https://huggingface.co/datasets/Norod78/simpsons-blip-captions/resolve/main/data/train-00000-of-00001-869eb753312e0f73.parquet"
   },
   "description": "Fine-tune SDXL on the Simpsons dataset. Uses split installation steps to prevent setup crashes."
 }

@@ -1,11 +1,11 @@
 {
   "title": "SDXL LoRA Training (Simpsons)",
   "name": "sdxl-lora-simpsons",
-  "command": "cd ~/sd-lora-train-task && python train_sd.py",
+  "command": "cd ~/sdxl-lora-simpsons && python train_sdxl.py",
   "cpus": "8",
   "memory": "32",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install diffusers[torch] transformers accelerate peft bitsandbytes datasets torchvision wandb transformerlab",
+  "setup": "uv pip install --upgrade \"datasets>=2.20.0\" diffusers[torch] transformers accelerate peft bitsandbytes torchvision wandb transformerlab",
   "env_vars": {
     "WANDB_PROJECT": "sdxl-lora-simpsons",
     "PYTHONUNBUFFERED": "1",

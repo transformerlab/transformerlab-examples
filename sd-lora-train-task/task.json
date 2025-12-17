@@ -1,16 +1,17 @@
 {
-  "title": "Stable Diffusion LoRA Training",
-  "name": "sd-lora-train-task",
+  "title": "SDXL LoRA Training (Simpsons)",
+  "name": "sdxl-lora-simpsons",
   "command": "cd ~/sd-lora-train-task && python train_sd.py",
-  "cpus": "4",
-  "memory": "16",
+  "cpus": "8",
+  "memory": "32",
   "accelerators": "RTX3090:1",
   "setup": "uv pip install diffusers[torch] transformers accelerate peft bitsandbytes datasets torchvision wandb transformerlab",
   "env_vars": {
-    "WANDB_PROJECT": "sd-lora-training",
+    "WANDB_PROJECT": "sdxl-lora-simpsons",
     "PYTHONUNBUFFERED": "1",
     "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
-    "MODEL_NAME": "runwayml/stable-diffusion-v1-5"
+    "MODEL_NAME": "stabilityai/stable-diffusion-xl-base-1.0",
+    "DATASET_NAME": "Norod78/simpsons-blip-captions"
   },
-  "description": "Fine-tune Stable Diffusion using LoRA (Low-Rank Adaptation) via Hugging Face Diffusers and PEFT. Generates a dummy dataset for demonstration if none is provided."
+  "description": "Fine-tune Stable Diffusion XL (SDXL) on the Simpsons dataset using LoRA. Uses dual text-encoders and a lower learning rate (1e-5) for stability."
 }

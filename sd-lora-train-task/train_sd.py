@@ -48,7 +48,7 @@ def setup_config():
         "train_batch_size": 1,
         "gradient_accumulation_steps": 4,
         "learning_rate": 1e-5, # Conservative LR
-        "max_train_steps": 500,
+        "max_train_steps": 50,
         "lora_rank": 8,
         "seed": 42,
     }

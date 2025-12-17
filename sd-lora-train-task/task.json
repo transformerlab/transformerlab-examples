@@ -5,13 +5,13 @@
   "cpus": "8",
   "memory": "32",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install --upgrade \"datasets>=2.20.0\" diffusers[torch] transformers accelerate peft bitsandbytes torchvision wandb transformerlab",
+  "setup": "uv pip install diffusers[torch] transformers accelerate peft bitsandbytes torchvision wandb pandas requests pyarrow transformerlab",
   "env_vars": {
     "WANDB_PROJECT": "sdxl-lora-simpsons",
     "PYTHONUNBUFFERED": "1",
     "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
     "MODEL_NAME": "stabilityai/stable-diffusion-xl-base-1.0",
-    "DATASET_NAME": "Norod78/simpsons-blip-captions"
+    "DATASET_URL": "https://huggingface.co/datasets/Norod78/simpsons-blip-captions/resolve/main/data/train-00000-of-00001.parquet"
   },
-  "description": "Fine-tune Stable Diffusion XL (SDXL) on the Simpsons dataset using LoRA. Uses dual text-encoders and a lower learning rate (1e-5) for stability."
+  "description": "Fine-tune Stable Diffusion XL (SDXL) on the Simpsons dataset using LoRA. Loads data directly via Pandas/Parquet to avoid library conflicts."
 }

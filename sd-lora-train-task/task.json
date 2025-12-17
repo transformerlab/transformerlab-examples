@@ -1,7 +1,7 @@
 {
   "title": "Stable Diffusion LoRA Training",
   "name": "sd-lora-train-task",
-  "command": "cd ~/sd-lora-train && python train_sd.py",
+  "command": "cd ~/sd-lora-train-task && python train_sd.py",
   "cpus": "4",
   "memory": "16",
   "accelerators": "RTX3090:1",

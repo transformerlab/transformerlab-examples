@@ -1,7 +1,7 @@
 {
   "title": "SDXL LoRA Training (Simpsons)",
   "name": "sdxl-lora-simpsons",
-  "command": "cd ~/sdxl-lora-simpsons && python train_sdxl.py",
+  "command": "cd ~/sd-lora-train-task && python train_sdxl.py",
   "cpus": "8",
   "memory": "32",
   "accelerators": "RTX3090:1",

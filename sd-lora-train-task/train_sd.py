@@ -41,11 +41,8 @@ def setup_config():
         login(token=os.getenv("HF_TOKEN"))
     
     return {
-        "experiment_name": "sd-lora-training",
         "model_name": os.getenv("MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0"),
         "dataset_url": os.getenv("DATASET_URL", "https://huggingface.co/datasets/Norod78/simpsons-blip-captions/resolve/main/data/train-00000-of-00001.parquet"),
-        "template_name": "sd-lora-demo",
-        "log_to_wandb": True,
         "output_dir": "./output",
         "resolution": 1024,
         "train_batch_size": 1,
@@ -133,7 +130,7 @@ def train_sdxl_lora():
     config = setup_config()
     lab.init()
     lab.set_config(config)
-
+    
     lab.log("🚀 Starting SDXL LoRA Training (Fixed VAE Precision)")
     
     start_time = datetime.now()
@@ -304,30 +301,30 @@ def train_sdxl_lora():
         unet_unwrapped = accelerator.unwrap_model(unet)
         unet_unwrapped.save_pretrained(config["output_dir"])
 
-    summary_file = os.path.join(config["output_dir"], "training_summary.json")
-    with open(summary_file, "w") as f:
-        json.dump({
-            "model": "SDXL Base 1.0",
-            "steps": global_step,
-            "final_loss": loss.item() if not torch.isnan(loss) else "NaN",
-            "completed_at": datetime.now().isoformat()
-        }, f, indent=2)
-    lab.save_artifact(summary_file, "training_summary.json")
+        summary_file = os.path.join(config["output_dir"], "training_summary.json")
+        with open(summary_file, "w") as f:
+            json.dump({
+                "model": "SDXL Base 1.0",
+                "steps": global_step,
+                "final_loss": loss.item() if not torch.isnan(loss) else "NaN",
+                "completed_at": datetime.now().isoformat()
+            }, f, indent=2)
+        lab.save_artifact(summary_file, "training_summary.json")
 
-    # Save Final Model
-    model_dir = os.path.join(config["output_dir"], "final_model")
-    os.makedirs(model_dir, exist_ok=True)
-    for file in os.listdir(config["output_dir"]):
-        if file.endswith((".safetensors", ".json")) and not file.startswith("training_"):
-            shutil.copy2(os.path.join(config["output_dir"], file), os.path.join(model_dir, file))
-    
-    saved_path = lab.save_model(model_dir, name="sdxl-lora-simpsons")
-    lab.log(f"✅ Model registered: {saved_path}")
-    
-    try:
-        import wandb
-        if wandb.run is not None: wandb.finish()
-    except: pass
+        # Save Final Model
+        model_dir = os.path.join(config["output_dir"], "final_model")
+        os.makedirs(model_dir, exist_ok=True)
+        for file in os.listdir(config["output_dir"]):
+            if file.endswith((".safetensors", ".json")) and not file.startswith("training_"):
+                shutil.copy2(os.path.join(config["output_dir"], file), os.path.join(model_dir, file))
+        
+        saved_path = lab.save_model(model_dir, name="sdxl-lora-simpsons")
+        lab.log(f"✅ Model registered: {saved_path}")
+        
+        try:
+            import wandb
+            if wandb.run is not None: wandb.finish()
+        except: pass
 
     lab.finish("SDXL Training Complete")
     return {"status": "success"}

@@ -1,6 +1,5 @@
 from unsloth import is_bfloat16_supported
 import os
-import time
 import torch
 from datetime import datetime
 
@@ -9,7 +8,6 @@ from datasets import Audio
 
 from trainer import CsmAudioTrainer, OrpheusAudioTrainer
 
-from transformerlab.sdk.v1.train import tlab_trainer  # noqa: E402
 from lab import lab
 
 # Login to huggingface
@@ -295,8 +293,6 @@ def train_model():
             
             progress_callback = LabCallback()
 
-            # Training run name
-            today = time.strftime("%Y%m%d-%H%M%S")
             trainer = Trainer(
             model=model,
             train_dataset=processed_ds,

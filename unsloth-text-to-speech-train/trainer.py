@@ -33,7 +33,15 @@ class AudioTrainerBase(ABC):
         self.max_audio_length = max_audio_length
         self.audio_column_name = audio_column_name
         self.text_column_name = text_column_name
-        self.lora_target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
+        self.lora_target_modules = [
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ]
 
     @abstractmethod
     def preprocess_dataset(self, example):
@@ -88,7 +96,9 @@ class CsmAudioTrainer(AudioTrainerBase):
             use_rslora=False,  # We support rank stabilized LoRA
             loftq_config=None,  # And LoftQ
         )
-        num_trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        num_trainable = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
         print(f"Trainable parameters: {num_trainable}")
 
     def preprocess_dataset(self, example):
@@ -122,20 +132,33 @@ class CsmAudioTrainer(AudioTrainerBase):
                 common_kwargs={"return_tensors": "pt"},
             )
         except Exception as e:
-            print(f"Error processing example with text '{example[self.text_column_name][:50]}...': {e}")
+            print(
+                f"Error processing example with text '{example[self.text_column_name][:50]}...': {e}"
+            )
             return None
 
-        required_keys = ["input_ids", "attention_mask", "labels", "input_values", "input_values_cutoffs"]
+        required_keys = [
+            "input_ids",
+            "attention_mask",
+            "labels",
+            "input_values",
+            "input_values_cutoffs",
+        ]
         processed_example = {}
         for key in required_keys:
             if key not in model_inputs:
-                print(f"Warning: Required key '{key}' not found in processor output for example.")
+                print(
+                    f"Warning: Required key '{key}' not found in processor output for example."
+                )
                 return None
 
             value = model_inputs[key][0]
             processed_example[key] = value
 
-        if not all(isinstance(processed_example[key], torch.Tensor) for key in processed_example):
+        if not all(
+            isinstance(processed_example[key], torch.Tensor)
+            for key in processed_example
+        ):
             print(
                 f"Error: Not all required keys are tensors in final processed example. Keys: {list(processed_example.keys())}"
             )
@@ -173,7 +196,9 @@ class OrpheusAudioTrainer(AudioTrainerBase):
             audio_column_name,
             text_column_name,
         )
-        self.snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").to(self.device)
+        self.snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").to(
+            self.device
+        )
         self.model, self.processor = FastLanguageModel.from_pretrained(
             model_name=self.model_name,
             max_seq_length=self.context_length,
@@ -193,7 +218,9 @@ class OrpheusAudioTrainer(AudioTrainerBase):
             use_rslora=False,  # We support rank stabilized LoRA
             loftq_config=None,  # And LoftQ
         )
-        num_trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        num_trainable = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
         print(f"Trainable parameters: {num_trainable}")
 
         # Define special tokens
@@ -265,7 +292,9 @@ class OrpheusAudioTrainer(AudioTrainerBase):
             codes_list = self._tokenize_audio(audio_array)
 
             if not codes_list:
-                print(f"Warning: Empty codes list for example with text '{example[self.text_column_name][:50]}...'")
+                print(
+                    f"Warning: Empty codes list for example with text '{example[self.text_column_name][:50]}...'"
+                )
                 return None
 
             # Remove duplicate frames for efficiency
@@ -273,7 +302,9 @@ class OrpheusAudioTrainer(AudioTrainerBase):
 
             # Create text prompt (multi-speaker or single-speaker)
             if self.speaker_key in example and example[self.speaker_key]:
-                text_prompt = f"{example[self.speaker_key]}: {example[self.text_column_name]}"
+                text_prompt = (
+                    f"{example[self.speaker_key]}: {example[self.text_column_name]}"
+                )
             else:
                 text_prompt = example[self.text_column_name]
 
@@ -303,12 +334,20 @@ class OrpheusAudioTrainer(AudioTrainerBase):
             if padding_length > 0 and self.batch_size > 1:
                 input_ids.extend([self.pad_token] * padding_length)
                 labels.extend([-100] * padding_length)
-                attention_mask = [1] * (len(input_ids) - padding_length) + [0] * padding_length
+                attention_mask = [1] * (len(input_ids) - padding_length) + [
+                    0
+                ] * padding_length
             else:
                 attention_mask = [1] * len(input_ids)
 
-            return {"input_ids": input_ids, "labels": labels, "attention_mask": attention_mask}
+            return {
+                "input_ids": input_ids,
+                "labels": labels,
+                "attention_mask": attention_mask,
+            }
 
         except Exception as e:
-            print(f"Error processing example with text '{example[self.text_column_name][:50]}...': {e}")
+            print(
+                f"Error processing example with text '{example[self.text_column_name][:50]}...': {e}"
+            )
             return None

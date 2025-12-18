@@ -41,16 +41,21 @@ def setup_config():
         login(token=os.getenv("HF_TOKEN"))
     
     return {
+        "experiment_name": "sd-lora-training",
         "model_name": os.getenv("MODEL_NAME", "stabilityai/stable-diffusion-xl-base-1.0"),
         "dataset_url": os.getenv("DATASET_URL", "https://huggingface.co/datasets/Norod78/simpsons-blip-captions/resolve/main/data/train-00000-of-00001.parquet"),
+        "template_name": "sd-demo",
+        "log_to_wanddb": True,
         "output_dir": "./output",
-        "resolution": 1024,
-        "train_batch_size": 1,
-        "gradient_accumulation_steps": 4,
-        "learning_rate": 1e-5, # Conservative LR
-        "max_train_steps": 50,
-        "lora_rank": 8,
-        "seed": 42,
+        "_config": {
+            "resolution": 1024,
+            "train_batch_size": 1,
+            "gradient_accumulation_steps": 4,
+            "learning_rate": 1e-5, # Conservative LR
+            "max_train_steps": 50,
+            "lora_rank": 8,
+            "seed": 42,
+        }
     }
 
 # --- Custom Dataset ---
@@ -142,12 +147,12 @@ def train_sdxl_lora():
 
     accelerator_config = ProjectConfiguration(project_dir=config["output_dir"], logging_dir=None)
     accelerator = Accelerator(
-        gradient_accumulation_steps=config["gradient_accumulation_steps"],
+        gradient_accumulation_steps=config["_config"]["gradient_accumulation_steps"],
         mixed_precision=mixed_precision,
         project_config=accelerator_config,
         log_with="wandb" if os.getenv("WANDB_PROJECT") else None
     )
-    set_seed(config["seed"])
+    set_seed(config["_config"]["seed"])
 
     # Load Models
     lab.log("Loading SDXL components...")
@@ -183,8 +188,8 @@ def train_sdxl_lora():
     # Dataset
     lab.log(f"Downloading dataset...")
     try:
-        train_dataset = SimpsonsParquetDataset(config["dataset_url"], resolution=config["resolution"])
-        train_dataloader = DataLoader(train_dataset, batch_size=config["train_batch_size"], shuffle=True, num_workers=0)
+        train_dataset = SimpsonsParquetDataset(config["dataset_url"], resolution=config["_config"]["resolution"])
+        train_dataloader = DataLoader(train_dataset, batch_size=config["_config"]["train_batch_size"], shuffle=True, num_workers=0)
     except Exception as e:
         lab.error(f"Dataset error: {e}")
         return {"status": "error"}
@@ -198,7 +203,7 @@ def train_sdxl_lora():
         optimizer_cls = torch.optim.AdamW
         lab.log("Using standard AdamW optimizer")
 
-    optimizer = optimizer_cls(unet.parameters(), lr=config["learning_rate"], weight_decay=1e-2)
+    optimizer = optimizer_cls(unet.parameters(), lr=config["_config"]["learning_rate"], weight_decay=1e-2)
 
     # Prepare
     unet, optimizer, train_dataloader = accelerator.prepare(unet, optimizer, train_dataloader)
@@ -216,10 +221,10 @@ def train_sdxl_lora():
     unet.to(accelerator.device) # UNet handles its own dtype via PEFT usually, but good to ensure
 
     # Training Loop
-    steps_per_epoch = len(train_dataloader) // config["gradient_accumulation_steps"]
-    num_epochs = int(np.ceil(config["max_train_steps"] / max(1, steps_per_epoch)))
+    steps_per_epoch = len(train_dataloader) // config["_config"]["gradient_accumulation_steps"]
+    num_epochs = int(np.ceil(config["_config"]["max_train_steps"] / max(1, steps_per_epoch)))
     
-    lab.log(f"Starting training for {config['max_train_steps']} steps...")
+    lab.log(f"Starting training for {config["_config"]['max_train_steps']} steps...")
     global_step = 0
     tokenizers = [tokenizer_1, tokenizer_2]
     text_encoders = [text_encoder_1, text_encoder_2]
@@ -252,7 +257,7 @@ def train_sdxl_lora():
 
                 # 4. Time IDs
                 add_time_ids = torch.cat(
-                    [compute_time_ids((config["resolution"], config["resolution"]), (0, 0), (config["resolution"], config["resolution"]), accelerator.device, weight_dtype) for _ in range(bsz)]
+                    [compute_time_ids((config["_config"]["resolution"], config["_config"]["resolution"]), (0, 0), (config["_config"]["resolution"], config["_config"]["resolution"]), accelerator.device, weight_dtype) for _ in range(bsz)]
                 )
 
                 # 5. Predict
@@ -282,13 +287,13 @@ def train_sdxl_lora():
 
             if accelerator.sync_gradients:
                 global_step += 1
-                progress = int((global_step / config["max_train_steps"]) * 100)
+                progress = int((global_step / config["_config"]["max_train_steps"]) * 100)
                 lab.update_progress(min(progress, 95))
                 
                 if global_step % 10 == 0:
                     lab.log(f"Step {global_step} - Loss: {loss.item():.4f}")
 
-            if global_step >= config["max_train_steps"]:
+            if global_step >= config["_config"]["max_train_steps"]:
                 break
         
         lab.log(f"📊 Completed epoch {epoch + 1}")
@@ -301,30 +306,30 @@ def train_sdxl_lora():
         unet_unwrapped = accelerator.unwrap_model(unet)
         unet_unwrapped.save_pretrained(config["output_dir"])
 
-        summary_file = os.path.join(config["output_dir"], "training_summary.json")
-        with open(summary_file, "w") as f:
-            json.dump({
-                "model": "SDXL Base 1.0",
-                "steps": global_step,
-                "final_loss": loss.item() if not torch.isnan(loss) else "NaN",
-                "completed_at": datetime.now().isoformat()
-            }, f, indent=2)
-        lab.save_artifact(summary_file, "training_summary.json")
+    summary_file = os.path.join(config["output_dir"], "training_summary.json")
+    with open(summary_file, "w") as f:
+        json.dump({
+            "model": "SDXL Base 1.0",
+            "steps": global_step,
+            "final_loss": loss.item() if not torch.isnan(loss) else "NaN",
+            "completed_at": datetime.now().isoformat()
+        }, f, indent=2)
+    lab.save_artifact(summary_file, "training_summary.json")
 
-        # Save Final Model
-        model_dir = os.path.join(config["output_dir"], "final_model")
-        os.makedirs(model_dir, exist_ok=True)
-        for file in os.listdir(config["output_dir"]):
-            if file.endswith((".safetensors", ".json")) and not file.startswith("training_"):
-                shutil.copy2(os.path.join(config["output_dir"], file), os.path.join(model_dir, file))
-        
-        saved_path = lab.save_model(model_dir, name="sdxl-lora-simpsons")
-        lab.log(f"✅ Model registered: {saved_path}")
-        
-        try:
-            import wandb
-            if wandb.run is not None: wandb.finish()
-        except: pass
+    # Save Final Model
+    model_dir = os.path.join(config["output_dir"], "final_model")
+    os.makedirs(model_dir, exist_ok=True)
+    for file in os.listdir(config["output_dir"]):
+        if file.endswith((".safetensors", ".json")) and not file.startswith("training_"):
+            shutil.copy2(os.path.join(config["output_dir"], file), os.path.join(model_dir, file))
+    
+    saved_path = lab.save_model(model_dir, name="sdxl-lora-simpsons")
+    lab.log(f"✅ Model registered: {saved_path}")
+    
+    try:
+        import wandb
+        if wandb.run is not None: wandb.finish()
+    except: pass
 
     lab.finish("SDXL Training Complete")
     return {"status": "success"}

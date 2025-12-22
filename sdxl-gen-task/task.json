@@ -1,0 +1,18 @@
+{
+  "title": "SDXL Image Generation (Black Cat)",
+  "name": "sdxl-gen-black-cat",
+  "command": "cd ~/sdxl-gen-task && python generate.py",
+  "cpus": "4",
+  "memory": "16",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install torch torchvision diffusers transformers accelerate transformerlab",
+  "env_vars": {
+    "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
+    "MODEL_NAME": "stabilityai/stable-diffusion-xl-base-1.0",
+    "PROMPT": "A cinematic close-up photo of a majestic black cat sitting on a mossy stone wall, golden hour lighting, yellow eyes, 8k resolution, photorealistic",
+    "NEGATIVE_PROMPT": "blurry, low quality, distorted, deformed, ugly, cartoon",
+    "NUM_IMAGES": "4",
+    "STEPS": "30"
+  },
+  "description": "Generates images using Stable Diffusion XL. configured to generate high-quality images of a Black Cat."
+}

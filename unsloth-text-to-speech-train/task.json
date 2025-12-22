@@ -5,7 +5,7 @@
   "cpus": "2",
   "memory": "4",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install unsloth snac transformerlab",
+  "setup": "uv pip install unsloth snac transformerlab  datasets==3.6.0 librosa soundfile",
   "env_vars": {
     "WANDB_PROJECT": "unsloth-text-to-speech-training",
     "PYTHONUNBUFFERED": "1",

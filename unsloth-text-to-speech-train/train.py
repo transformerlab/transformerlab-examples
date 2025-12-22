@@ -140,7 +140,7 @@ def train_model():
         "_config": {
             "dataset_name": "bosonai/EmergentTTS-Eval",
             "audio_column_name": "audio",
-            "text_column_name": "text",
+            "text_column_name": "text_to_synthesize",
             "lora_alpha": 32,
             "lora_dropout": 0.0,
             "lora_r": 16,

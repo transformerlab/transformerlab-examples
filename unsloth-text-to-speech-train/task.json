@@ -5,7 +5,7 @@
   "cpus": "2",
   "memory": "4",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install unsloth snac",
+  "setup": "uv pip install unsloth snac transformerlab",
   "env_vars": {
     "WANDB_PROJECT": "unsloth-text-to-speech-training",
     "PYTHONUNBUFFERED": "1",

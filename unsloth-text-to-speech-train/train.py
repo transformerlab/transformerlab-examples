@@ -297,7 +297,7 @@ def train_model():
                 return {"status": "error", "error": "Unsupported model architecture."}
 
             model = model_trainer.model
-            tokenizer = model_trainer.tokenizer
+            tokenizer = model_trainer.processor
         except Exception as e:
             lab.log(f"❌ Failed to load model: {e}")
             import traceback

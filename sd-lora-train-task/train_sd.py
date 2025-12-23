@@ -44,10 +44,10 @@ def setup_config():
         "train_batch_size": 1,
         "gradient_accumulation_steps": 4,
         "learning_rate": 1e-5, 
-        "max_train_steps": 50,
+        "max_train_steps": 300,
         "lora_rank": 8,
         "seed": 42,
-        "validation_prompt": "Homer Simpson in the style of The Simpsons, high quality, 4k",
+        "validation_prompt": "A single-family home in a typical American suburb in the 1990s",
     }
 
 class SimpsonsParquetDataset(Dataset):

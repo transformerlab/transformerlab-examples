@@ -104,7 +104,7 @@ def run_evaluation():
         with open(json_path, "w") as f:
             json.dump(results, f, indent=2, default=str)
             
-        saved_json = lab.save_artifact(json_path, "evaluation_results.json")
+        saved_json = lab.save_artifact(json_path, "evaluation_results.json", type="eval")
         lab.log(f"saved artifact: {saved_json}")
 
         # Save a readable summary text file
@@ -115,7 +115,7 @@ def run_evaluation():
             f.write("============================================\n\n")
             f.write(results_table)
             
-        saved_txt = lab.save_artifact(txt_path, "evaluation_summary.txt")
+        saved_txt = lab.save_artifact(txt_path, "evaluation_summary.txt", type="eval")
         lab.log(f"saved artifact: {saved_txt}")
         
         lab.update_progress(100)

@@ -1,0 +1,13 @@
+{
+  "title": "Unsloth GRPO Training Task",
+  "name": "unsloth-grpo-train-task",
+  "command": "cd ~/unsloth_grpo_train && python train.py",
+  "accelerators": "A100-80GB:1",
+  "setup": "uv pip install trl==0.15.2 bitsandbytes==0.45.4 unsloth== 2025.12.9 transformerlab datasets jinja2",
+  "env_vars": {
+    "WANDB_PROJECT": "unsloth-grpo-training",
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE"
+  },
+  "description": "A GRPO trainer based on the unsloth grpo training notebooks for training models with reasoning capabilities."
+}

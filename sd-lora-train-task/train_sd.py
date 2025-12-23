@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Training script for Stable Diffusion XL (SDXL) using LoRA.
-Fixed: VAE is forced to float32 to prevent NaN losses.
 """
 
 import os
@@ -19,10 +18,8 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 
-# TransformerLab import
 from lab import lab
 
-# Imports
 from huggingface_hub import login
 from accelerate import Accelerator
 from accelerate.utils import ProjectConfiguration, set_seed
@@ -31,10 +28,9 @@ from diffusers import (
     AutoencoderKL,
     DDPMScheduler,
     UNet2DConditionModel,
+    StableDiffusionXLPipeline,
 )
 from transformers import AutoTokenizer, CLIPTextModel, CLIPTextModelWithProjection
-
-# --- Configuration ---
 
 def setup_config():
     if os.getenv("HF_TOKEN"):
@@ -47,13 +43,12 @@ def setup_config():
         "resolution": 1024,
         "train_batch_size": 1,
         "gradient_accumulation_steps": 4,
-        "learning_rate": 1e-5, # Conservative LR
+        "learning_rate": 1e-5, 
         "max_train_steps": 50,
         "lora_rank": 8,
         "seed": 42,
+        "validation_prompt": "Homer Simpson in the style of The Simpsons, high quality, 4k",
     }
-
-# --- Custom Dataset ---
 
 class SimpsonsParquetDataset(Dataset):
     def __init__(self, parquet_url, resolution=1024):
@@ -97,7 +92,6 @@ class SimpsonsParquetDataset(Dataset):
         text = str(row['text']) if 'text' in row else ""
         return {"pixel_values": pixel_values, "text": text}
 
-# --- SDXL Helpers ---
 
 def compute_embeddings(prompt_batch, tokenizers, text_encoders, device):
     prompt_embeds_list = []
@@ -124,16 +118,49 @@ def compute_time_ids(original_size, crops_coords_top_left, target_size, device, 
     add_time_ids = torch.tensor([add_time_ids], dtype=dtype, device=device)
     return add_time_ids
 
-# --- Main Training ---
+def generate_and_save_sample(accelerator, config, tokenizer_1, tokenizer_2, text_encoder_1, text_encoder_2, vae, unet, scheduler, filename, label):
+    """Generates an image and saves it as a lab artifact."""
+    lab.log(f"Generating {label} image...")
+    
+    # Create pipeline from components
+    pipeline = StableDiffusionXLPipeline(
+        vae=vae,
+        text_encoder=text_encoder_1,
+        text_encoder_2=text_encoder_2,
+        tokenizer=tokenizer_1,
+        tokenizer_2=tokenizer_2,
+        unet=accelerator.unwrap_model(unet),
+        scheduler=scheduler,
+        force_zeros_for_empty_prompt=True,
+    )
+    pipeline.to(accelerator.device)
+    
+    # Use standard inference settings
+    with torch.no_grad():
+        image = pipeline(
+            prompt=config["validation_prompt"],
+            num_inference_steps=30,
+            generator=torch.Generator(device=accelerator.device).manual_seed(config["seed"]),
+        ).images[0]
+    
+    # Save locally and then as artifact
+    path = os.path.join(config["output_dir"], filename)
+    image.save(path)
+    lab.save_artifact(path, filename)
+    lab.log(f"✅ {label} image saved to {filename}")
+    
+    # Clean up to save VRAM (pipeline shares components, so just delete the wrapper)
+    del pipeline
+    torch.cuda.empty_cache()
+
 
 def train_sdxl_lora():
     config = setup_config()
     lab.init()
     lab.set_config(config)
     
-    lab.log("🚀 Starting SDXL LoRA Training (Fixed VAE Precision)")
+    lab.log("🚀 Starting SDXL LoRA Training")
     
-    start_time = datetime.now()
     os.makedirs(config["output_dir"], exist_ok=True)
 
     mixed_precision = "fp16"
@@ -145,35 +172,35 @@ def train_sdxl_lora():
         gradient_accumulation_steps=config["gradient_accumulation_steps"],
         mixed_precision=mixed_precision,
         project_config=accelerator_config,
-        log_with="wandb" if os.getenv("WANDB_PROJECT") else None
     )
     set_seed(config["seed"])
 
     # Load Models
     lab.log("Loading SDXL components...")
-    try:
-        tokenizer_1 = AutoTokenizer.from_pretrained(config["model_name"], subfolder="tokenizer", use_fast=False)
-        tokenizer_2 = AutoTokenizer.from_pretrained(config["model_name"], subfolder="tokenizer_2", use_fast=False)
-        
-        text_encoder_1 = CLIPTextModel.from_pretrained(config["model_name"], subfolder="text_encoder")
-        text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(config["model_name"], subfolder="text_encoder_2")
-        
-        vae = AutoencoderKL.from_pretrained(config["model_name"], subfolder="vae")
-        unet = UNet2DConditionModel.from_pretrained(config["model_name"], subfolder="unet")
-        noise_scheduler = DDPMScheduler.from_pretrained(config["model_name"], subfolder="scheduler")
-        lab.log("✅ SDXL models loaded.")
-    except Exception as e:
-        lab.error(f"Failed to load models: {e}")
-        return {"status": "error"}
+    tokenizer_1 = AutoTokenizer.from_pretrained(config["model_name"], subfolder="tokenizer", use_fast=False)
+    tokenizer_2 = AutoTokenizer.from_pretrained(config["model_name"], subfolder="tokenizer_2", use_fast=False)
+    text_encoder_1 = CLIPTextModel.from_pretrained(config["model_name"], subfolder="text_encoder")
+    text_encoder_2 = CLIPTextModelWithProjection.from_pretrained(config["model_name"], subfolder="text_encoder_2")
+    vae = AutoencoderKL.from_pretrained(config["model_name"], subfolder="vae")
+    unet = UNet2DConditionModel.from_pretrained(config["model_name"], subfolder="unet")
+    noise_scheduler = DDPMScheduler.from_pretrained(config["model_name"], subfolder="scheduler")
 
-    # Freeze
+    # Generate BEFORE image (using the base model)
+    if accelerator.is_main_process:
+        generate_and_save_sample(
+            accelerator, config, tokenizer_1, tokenizer_2, 
+            text_encoder_1, text_encoder_2, vae, unet, 
+            noise_scheduler, "before_finetuning.png", "Before Fine-Tuning"
+        )
+
+    # Freeze base models
     vae.requires_grad_(False)
     text_encoder_1.requires_grad_(False)
     text_encoder_2.requires_grad_(False)
     unet.requires_grad_(False)
     unet.enable_gradient_checkpointing()
 
-    # LoRA
+    # Apply LoRA
     lora_config = LoraConfig(
         r=config["lora_rank"], lora_alpha=config["lora_rank"],
         init_lora_weights="gaussian", target_modules=["to_k", "to_q", "to_v", "to_out.0"],
@@ -181,153 +208,77 @@ def train_sdxl_lora():
     unet = get_peft_model(unet, lora_config)
 
     # Dataset
-    lab.log(f"Downloading dataset...")
-    try:
-        train_dataset = SimpsonsParquetDataset(config["dataset_url"], resolution=config["resolution"])
-        train_dataloader = DataLoader(train_dataset, batch_size=config["train_batch_size"], shuffle=True, num_workers=0)
-    except Exception as e:
-        lab.error(f"Dataset error: {e}")
-        return {"status": "error"}
+    train_dataset = SimpsonsParquetDataset(config["dataset_url"], resolution=config["resolution"])
+    train_dataloader = DataLoader(train_dataset, batch_size=config["train_batch_size"], shuffle=True)
 
     # Optimizer
-    try:
-        import bitsandbytes as bnb
-        optimizer_cls = bnb.optim.AdamW8bit
-        lab.log("Using 8-bit AdamW optimizer")
-    except ImportError:
-        optimizer_cls = torch.optim.AdamW
-        lab.log("Using standard AdamW optimizer")
+    optimizer = torch.optim.AdamW(unet.parameters(), lr=config["learning_rate"])
 
-    optimizer = optimizer_cls(unet.parameters(), lr=config["learning_rate"], weight_decay=1e-2)
-
-    # Prepare
+    # Prepare for accelerator
     unet, optimizer, train_dataloader = accelerator.prepare(unet, optimizer, train_dataloader)
 
-    # Handle Precision
+    # Precision Handling
     weight_dtype = torch.float32
     if accelerator.mixed_precision == "fp16": weight_dtype = torch.float16
     elif accelerator.mixed_precision == "bf16": weight_dtype = torch.bfloat16
 
-    # Move models to GPU
-    # IMPORTANT: VAE must stay in float32 to avoid NaN
-    vae.to(accelerator.device, dtype=torch.float32) 
+    vae.to(accelerator.device, dtype=torch.float32) # VAE always float32
     text_encoder_1.to(accelerator.device, dtype=weight_dtype)
     text_encoder_2.to(accelerator.device, dtype=weight_dtype)
-    unet.to(accelerator.device) # UNet handles its own dtype via PEFT usually, but good to ensure
 
     # Training Loop
-    steps_per_epoch = len(train_dataloader) // config["gradient_accumulation_steps"]
-    num_epochs = int(np.ceil(config["max_train_steps"] / max(1, steps_per_epoch)))
-    
-    lab.log(f"Starting training for {config['max_train_steps']} steps...")
     global_step = 0
     tokenizers = [tokenizer_1, tokenizer_2]
     text_encoders = [text_encoder_1, text_encoder_2]
 
-    for epoch in range(num_epochs):
+    lab.log(f"Starting training...")
+    while global_step < config["max_train_steps"]:
         unet.train()
-        for step, batch in enumerate(train_dataloader):
+        for batch in train_dataloader:
             with accelerator.accumulate(unet):
-                # 1. Encode Images -> Latents (Force FP32 for VAE)
-                # We cast pixels to float32 for the VAE
+                # Encode Latents
                 pixel_values = batch["pixel_values"].to(accelerator.device, dtype=torch.float32)
-                latents = vae.encode(pixel_values).latent_dist.sample()
-                latents = latents * vae.config.scaling_factor
-                
-                # Cast latents back to weight_dtype (fp16) for the UNet
+                latents = vae.encode(pixel_values).latent_dist.sample() * vae.config.scaling_factor
                 latents = latents.to(dtype=weight_dtype)
 
-                # 2. Noise
+                # Noise
                 noise = torch.randn_like(latents)
-                bsz = latents.shape[0]
-                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (bsz,), device=latents.device).long()
+                timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=latents.device).long()
                 noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-                # 3. Text Embeds
-                prompt_embeds, pooled_prompt_embeds = compute_embeddings(
-                    batch["text"], tokenizers, text_encoders, accelerator.device
-                )
-                prompt_embeds = prompt_embeds.to(dtype=weight_dtype)
-                pooled_prompt_embeds = pooled_prompt_embeds.to(dtype=weight_dtype)
+                # Embeddings
+                prompt_embeds, pooled_prompt_embeds = compute_embeddings(batch["text"], tokenizers, text_encoders, accelerator.device)
+                add_time_ids = torch.cat([compute_time_ids((config["resolution"], config["resolution"]), (0, 0), (config["resolution"], config["resolution"]), accelerator.device, weight_dtype)])
 
-                # 4. Time IDs
-                add_time_ids = torch.cat(
-                    [compute_time_ids((config["resolution"], config["resolution"]), (0, 0), (config["resolution"], config["resolution"]), accelerator.device, weight_dtype) for _ in range(bsz)]
-                )
-
-                # 5. Predict
-                unet_added_conditions = {"time_ids": add_time_ids, "text_embeds": pooled_prompt_embeds}
-                model_pred = unet(noisy_latents, timesteps, prompt_embeds, added_cond_kwargs=unet_added_conditions).sample
-
-                if noise_scheduler.config.prediction_type == "epsilon": target = noise
-                elif noise_scheduler.config.prediction_type == "v_prediction": target = noise_scheduler.get_velocity(latents, noise, timesteps)
-                else: target = noise
-
-                loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
-                
-                # Check for NaN
-                if torch.isnan(loss):
-                    print("⚠️ Loss is NaN. Skipping step.")
-                    optimizer.zero_grad()
-                    continue
+                # Predict
+                model_pred = unet(noisy_latents, timesteps, prompt_embeds, added_cond_kwargs={"time_ids": add_time_ids, "text_embeds": pooled_prompt_embeds}).sample
+                loss = F.mse_loss(model_pred.float(), noise.float(), reduction="mean")
 
                 accelerator.backward(loss)
-                
-                # Gradient Clipping (Crucial for stability)
-                if accelerator.sync_gradients:
-                    accelerator.clip_grad_norm_(unet.parameters(), 1.0)
-                    
                 optimizer.step()
                 optimizer.zero_grad()
 
             if accelerator.sync_gradients:
                 global_step += 1
-                progress = int((global_step / config["max_train_steps"]) * 100)
-                lab.update_progress(min(progress, 95))
-                
-                if global_step % 10 == 0:
-                    lab.log(f"Step {global_step} - Loss: {loss.item():.4f}")
+                lab.update_progress(int((global_step / config["max_train_steps"]) * 100))
+            
+            if global_step >= config["max_train_steps"]: break
 
-            if global_step >= config["max_train_steps"]:
-                break
-        
-        lab.log(f"📊 Completed epoch {epoch + 1}")
+    # Generate AFTER image
+    if accelerator.is_main_process:
+        generate_and_save_sample(
+            accelerator, config, tokenizer_1, tokenizer_2, 
+            text_encoder_1, text_encoder_2, vae, unet, 
+            noise_scheduler, "after_finetuning.png", "After Fine-Tuning"
+        )
 
-    # Save
-    lab.log("Saving final model...")
-    accelerator.wait_for_everyone()
-    
+    # Save final model
     if accelerator.is_main_process:
         unet_unwrapped = accelerator.unwrap_model(unet)
         unet_unwrapped.save_pretrained(config["output_dir"])
-
-        summary_file = os.path.join(config["output_dir"], "training_summary.json")
-        with open(summary_file, "w") as f:
-            json.dump({
-                "model": "SDXL Base 1.0",
-                "steps": global_step,
-                "final_loss": loss.item() if not torch.isnan(loss) else "NaN",
-                "completed_at": datetime.now().isoformat()
-            }, f, indent=2)
-        lab.save_artifact(summary_file, "training_summary.json")
-
-        # Save Final Model
-        model_dir = os.path.join(config["output_dir"], "final_model")
-        os.makedirs(model_dir, exist_ok=True)
-        for file in os.listdir(config["output_dir"]):
-            if file.endswith((".safetensors", ".json")) and not file.startswith("training_"):
-                shutil.copy2(os.path.join(config["output_dir"], file), os.path.join(model_dir, file))
-        
-        saved_path = lab.save_model(model_dir, name="sdxl-lora-simpsons")
-        lab.log(f"✅ Model registered: {saved_path}")
-        
-        try:
-            import wandb
-            if wandb.run is not None: wandb.finish()
-        except: pass
+        lab.save_model(config["output_dir"], name="sdxl-lora-simpsons")
 
     lab.finish("SDXL Training Complete")
-    return {"status": "success"}
 
 if __name__ == "__main__":
     train_sdxl_lora()

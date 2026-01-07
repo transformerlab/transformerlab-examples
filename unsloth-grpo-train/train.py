@@ -165,7 +165,7 @@ def train_model():
         "dataset": "openai/gsm8k",  # Example dataset for reasoning
         "template_name": "unsloth-grpo-demo",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             "dataset_name": "openai/gsm8k",
             "dataset_config": "main",
@@ -184,7 +184,7 @@ def train_model():
             "max_grad_norm": 0.3,
             "learning_rate": 5e-05,
             "learning_rate_schedule": "constant",
-            "batch_size": 4,
+            "batch_size": 1,
             "num_train_epochs": 1,
             "weight_decay": 0.0,
             "adam_beta1": 0.9,

@@ -2,8 +2,6 @@
   "title": "Unsloth Text-to-Speech Training Task",
   "name": "unsloth-text-to-speech-train-task",
   "command": "cd ~/unsloth-text-to-speech-train && python train.py", 
-  "cpus": "2",
-  "memory": "4",
   "accelerators": "RTX3090:1",
   "setup": "uv pip install unsloth snac transformerlab  datasets==3.6.0 librosa soundfile",
   "env_vars": {

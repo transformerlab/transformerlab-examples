@@ -1,7 +1,7 @@
 {
   "title": "Autotrain SFT Training Task",
   "name": "autotrain-sft-train-task",
-  "command": "cd ~/autotrain-sft-train && python train.py",
+  "command": "cd ~/autotrain-sft && python train.py",
   "accelerators": "A100-80GB:1",
   "setup": "uv pip install autotrain-advanced bitsandbytes transformerlab wandb",
   "env_vars": {

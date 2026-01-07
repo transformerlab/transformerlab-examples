@@ -51,8 +51,7 @@ def train_model():
         # Parameters to pass to autotrain
         learning_rate = config["learning_rate"]
         batch_size = config.get("batch_size", 4)
-        num_train_epochs = config.get("num_train_epochs", 4)
-        max_steps = config.get("max_steps", -1)
+        num_train_epochs = config.get("num_train_epochs", 1)
 
         # Generate a model name using the original model and the passed adaptor
         adaptor_name = config.get("adaptor_name", "default")
@@ -77,12 +76,13 @@ def train_model():
             # In a real implementation, this would be passed from the UI
             dataset_name = training_config["dataset"]
             datasets = load_dataset(dataset_name)
-
-            dataset_types = ["train", "test"] if "test" in datasets else ["train"]
-            dataset = {}
-            for dt in dataset_types:
-                if dt in datasets:
-                    dataset[dt] = datasets[dt]
+            
+            # Take only a small subset for fast testing
+            train_subset = datasets["train"].select(range(min(100, len(datasets["train"]))))
+            test_subset = datasets["test"].select(range(min(20, len(datasets["test"]))))
+            
+            dataset_types = ["train", "test"]
+            dataset = {"train": train_subset, "test": test_subset}
 
         except Exception as e:
             lab.log(f"❌ Failed to load dataset: {e}")
@@ -90,7 +90,7 @@ def train_model():
             return {"status": "error", "error": str(e)}
 
         for dataset_type in dataset_types:
-            lab.log(f"Loaded {dataset_type} dataset with {len(dataset[dataset_type])} examples.")
+            lab.log(f"Loaded {dataset_type} dataset with {len(dataset[dataset_type])} examples (subset for fast testing).")
 
             # Output training files in templated format
             with open(f"{data_directory}/{dataset_type}.jsonl", "w") as f:
@@ -137,8 +137,6 @@ def train_model():
             "--auto_find_batch_size",
             "--project-name",
             project_name,
-            "--max_steps",
-            str(max_steps),
         ]
 
         lab.log("Running command:")

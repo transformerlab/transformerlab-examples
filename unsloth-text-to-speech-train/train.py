@@ -509,7 +509,7 @@ def train_model():
             "output_dir": training_config["output_dir"],
             "saved_model_path": saved_path,
             "wandb_url": captured_wandb_url,
-            "trainer_type": "Unsloth FastLanguageModel",
+            "trainer_type": "Unsloth TTS Trainer",
             "gpu_used": os.environ.get("CUDA_VISIBLE_DEVICES", "all"),
         }
 

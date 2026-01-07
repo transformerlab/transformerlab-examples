@@ -386,7 +386,7 @@ def train_model():
             max_steps=max_steps,
             weight_decay=weight_decay,
             per_device_train_batch_size=batch_size,
-            num_generations=batch_size,
+            num_generations=max(2, batch_size),  # GRPO requires at least 2 generations per prompt
             gradient_accumulation_steps=2,
             gradient_checkpointing=True,
             optim="paged_adamw_32bit",

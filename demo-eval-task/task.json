@@ -1,0 +1,9 @@
+{
+  "title": "Sample Evals Task",
+  "name": "sample-eval-task",
+  "command": "python ~/demo-eval-task/fake_evals.py",
+  "cpus": "2",
+  "memory": "4",
+  "setup": "uv pip install transformerlab datasets;",
+  "description": "A fake task to show evals capabilities"
+}

@@ -56,7 +56,7 @@ def train_model():
 
         # Generate a model name using the original model and the passed adaptor
         adaptor_name = config.get("adaptor_name", "default")
-        input_model_no_author = config["model_name"].split("/")[-1]
+        input_model_no_author = training_config["model_name"].split("/")[-1]
         project_name = f"{input_model_no_author}-{adaptor_name}".replace(".", "")
 
         # Setup directories
@@ -75,7 +75,7 @@ def train_model():
 
             # For now, assume dataset is specified in config
             # In a real implementation, this would be passed from the UI
-            dataset_name = config.get("dataset_name", "your-dataset-name")
+            dataset_name = training_config["dataset"]
             datasets = load_dataset(dataset_name)
 
             dataset_types = ["train", "test"] if "test" in datasets else ["train"]
@@ -121,7 +121,7 @@ def train_model():
             "llm",
             "--train",
             "--model",
-            config["model_name"],
+            training_config["model_name"],
             "--data-path",
             data_directory,
             "--lr",

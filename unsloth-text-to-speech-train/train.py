@@ -361,6 +361,7 @@ def train_model():
                     adam_epsilon=training_config["_config"]["adam_epsilon"],
                     disable_tqdm=False,
                     seed=3407,
+                    report_to="wandb" if training_config.get("log_to_wandb", True) else "none",
                     output_dir=training_config["output_dir"],
                     resume_from_checkpoint=checkpoint if checkpoint else None,
                 ),

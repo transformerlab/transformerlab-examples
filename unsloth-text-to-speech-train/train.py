@@ -136,7 +136,7 @@ def train_model():
         "dataset": "bosonai/EmergentTTS-Eval",  # Example dataset
         "template_name": "unsloth-tts-demo",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             "dataset_name": "bosonai/EmergentTTS-Eval",
             "audio_column_name": "audio",

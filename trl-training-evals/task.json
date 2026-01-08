@@ -3,7 +3,7 @@
   "name": "trl-train-task",
   "command": "cd ~/trl-training-evals && python train.py",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install transformerlab datasets transformers torch wandb;\nsudo apt update;\nsudo apt install -y libgl1 libglib2.0-0;",
+  "setup": "uv pip install transformerlab datasets transformers torch pandas trl wandb lm_eval==0.4.7;\nsudo apt update;\nsudo apt install -y libgl1 libglib2.0-0;",
   "env_vars": {
     "WANDB_PROJECT": "trl-training-project",
     "PYTHONUNBUFFERED": "1",

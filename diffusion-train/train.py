@@ -424,8 +424,8 @@ def train_diffusion_lora():
             dataset = datasets_dict
             lab.log(f"✅ Loaded dataset: {dataset_name}")
         except Exception as e:
-            lab.log(f"⚠️  Could not load {dataset_name}: {e}")
-            lab.log("Creating a simple synthetic dataset for testing...")
+            lab.log(f"❌ Failed to load dataset {dataset_name}: {e}")
+            raise RuntimeError(f"Could not load dataset {dataset_name}. Please check the dataset name and ensure it's available.")
         
         lab.log(f"Loaded dataset with {len(dataset)} examples (limited to 20 for testing)")
         lab.update_progress(10)

@@ -419,10 +419,10 @@ def train_diffusion_lora():
         
         dataset_name = training_config["dataset"]
         try:
-            # Try to load the specified dataset
-            # Use download_mode="force_redownload" to avoid cache issues
-            datasets_dict = load_dataset(dataset_name, split="train[:20]", download_mode="force_redownload")  # Load only 20 samples
-            dataset = datasets_dict
+            # Load the full dataset first, then slice it to avoid cache issues
+            datasets_dict = load_dataset(dataset_name, split="train")
+            # Take only the first 20 samples for testing
+            dataset = datasets_dict.select(range(min(20, len(datasets_dict))))
             lab.log(f"✅ Loaded dataset: {dataset_name}")
         except Exception as e:
             lab.log(f"❌ Failed to load dataset {dataset_name}: {e}")

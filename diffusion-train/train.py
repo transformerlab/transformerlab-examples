@@ -1,4 +1,5 @@
 import math
+import time
 import random
 import json
 import gc
@@ -305,8 +306,8 @@ def generate_sample_images(pipeline, prompt, num_images, output_dir, prefix, arg
         image.save(image_path)
         
         # Save as artifact through lab
-        lab.save_artifact(image_path, image_filename)
-        lab.log(f"Saved {image_filename}")
+        artifact_path = lab.save_artifact(image_path, image_filename)
+        lab.log(f"Saved {image_filename} as artifact: {artifact_path}")
     
     lab.log(f"✅ Generated {num_images} {prefix} images")
 
@@ -981,10 +982,11 @@ def train_diffusion_lora():
         unet = unet.to(torch.float32)
         model_lora_state_dict = convert_state_dict_to_diffusers(get_peft_model_state_dict(unet))
         
-        save_directory = args.get("adaptor_output_dir", os.path.join(output_dir, "lora"))
-        os.makedirs(save_directory, exist_ok=True)
+        # Create model directory within output_dir (following unsloth pattern)
+        model_dir = os.path.join(output_dir, "final_model")
+        os.makedirs(model_dir, exist_ok=True)
         
-        lab.log(f"Saving LoRA weights to {save_directory}")
+        lab.log(f"Saving LoRA weights to {model_dir}")
         
         # Save configuration info
         save_info = {
@@ -997,7 +999,7 @@ def train_diffusion_lora():
             "training_completed": True,
         }
         
-        config_path = os.path.join(save_directory, "lora_config.json")
+        config_path = os.path.join(model_dir, "lora_config.json")
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(save_info, f, indent=4)
         
@@ -1007,7 +1009,7 @@ def train_diffusion_lora():
         if not is_sdxl and not is_sd3 and not is_flux:
             try:
                 StableDiffusionPipeline.save_lora_weights(
-                    save_directory=save_directory,
+                    save_directory=model_dir,
                     unet_lora_layers=model_lora_state_dict,
                     safe_serialization=True,
                 )
@@ -1020,7 +1022,7 @@ def train_diffusion_lora():
             try:
                 from diffusers import StableDiffusionXLPipeline
                 StableDiffusionXLPipeline.save_lora_weights(
-                    save_directory=save_directory,
+                    save_directory=model_dir,
                     unet_lora_layers=model_lora_state_dict,
                     text_encoder_lora_layers=None,
                     text_encoder_2_lora_layers=None,
@@ -1035,7 +1037,7 @@ def train_diffusion_lora():
             try:
                 from diffusers import StableDiffusion3Pipeline
                 StableDiffusion3Pipeline.save_lora_weights(
-                    save_directory=save_directory,
+                    save_directory=model_dir,
                     unet_lora_layers=model_lora_state_dict,
                     safe_serialization=True,
                 )
@@ -1049,13 +1051,13 @@ def train_diffusion_lora():
                 from diffusers import FluxPipeline
                 try:
                     FluxPipeline.save_lora_weights(
-                        save_directory=save_directory,
+                        save_directory=model_dir,
                         transformer_lora_layers=model_lora_state_dict,
                         safe_serialization=True,
                     )
                 except TypeError:
                     FluxPipeline.save_lora_weights(
-                        save_directory=save_directory,
+                        save_directory=model_dir,
                         unet_lora_layers=model_lora_state_dict,
                         safe_serialization=True,
                     )
@@ -1067,17 +1069,17 @@ def train_diffusion_lora():
         if not saved_successfully:
             try:
                 from safetensors.torch import save_file
-                save_file(model_lora_state_dict, os.path.join(save_directory, "pytorch_lora_weights.safetensors"))
+                save_file(model_lora_state_dict, os.path.join(model_dir, "pytorch_lora_weights.safetensors"))
                 lab.log(f"✅ LoRA weights saved (safetensors fallback)")
                 saved_successfully = True
             except Exception as e:
                 lab.log(f"⚠️  Error with safetensors: {e}")
-                torch.save(model_lora_state_dict, os.path.join(save_directory, "pytorch_lora_weights.bin"))
+                torch.save(model_lora_state_dict, os.path.join(model_dir, "pytorch_lora_weights.bin"))
                 lab.log(f"✅ LoRA weights saved (PyTorch fallback)")
                 saved_successfully = True
         
         # Save the model using lab
-        saved_model_path = lab.save_model(save_directory, name="diffusion_lora_model")
+        saved_model_path = lab.save_model(model_dir, name="diffusion_lora_model")
         lab.log(f"✅ Model saved to: {saved_model_path}")
         
         # Calculate training time
@@ -1106,8 +1108,8 @@ def train_diffusion_lora():
         with open(summary_file, "w") as f:
             json.dump(summary, f, indent=2)
         
-        lab.save_artifact(summary_file, "training_summary.json")
-        lab.log("✅ Training summary saved")
+        artifact_path = lab.save_artifact(summary_file, "training_summary.json")
+        lab.log(f"✅ Training summary saved as artifact: {artifact_path}")
         
         lab.update_progress(100)
         lab.finish("Training completed successfully")

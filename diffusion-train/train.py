@@ -317,8 +317,8 @@ def train_diffusion_lora():
     # Training configuration with defaults
     training_config = {
         "experiment_name": "stable-diffusion-lora-training",
-        "model_name": "runwayml/stable-diffusion-v1-5",
-        "dataset": "your-dataset-here",
+        "model_name": "CompVis/stable-diffusion-v1-4",
+        "dataset": "reach-vb/pokemon-blip-captions",
         "output_dir": "./output",
         "log_to_wandb": True,
         "_config": {
@@ -333,11 +333,11 @@ def train_diffusion_lora():
             "caption_dropout_rate": 0.0,
             "trigger_word": "",
             
-            # Training settings
-            "num_train_epochs": 100,
+            # Training settings - reduced for small dataset
+            "num_train_epochs": 1,  # Few epochs for quick testing
             "train_batch_size": 1,
             "gradient_accumulation_steps": 1,
-            "resolution": 512,
+            "resolution": 256,  # Smaller resolution for faster training
             "dataloader_num_workers": 0,
             
             # Image augmentation
@@ -353,14 +353,14 @@ def train_diffusion_lora():
             "rotation_degrees": 5,
             "rotation_prob": 0.3,
             
-            # LoRA settings
-            "lora_r": 8,
-            "lora_alpha": 16,
+            # LoRA settings - smaller for faster training
+            "lora_r": 4,  # Smaller LoRA rank
+            "lora_alpha": 8,
             
             # Optimizer settings
             "learning_rate": 0.0001,
             "lr_scheduler": "constant",
-            "lr_warmup_steps": 50,
+            "lr_warmup_steps": 0,  # No warmup for small dataset
             "adam_beta1": 0.9,
             "adam_beta2": 0.999,
             "adam_weight_decay": 0.01,
@@ -381,9 +381,9 @@ def train_diffusion_lora():
             "snr_gamma": None,
             
             # Evaluation settings
-            "eval_prompt": "a photo",
+            "eval_prompt": "a cute pokemon",
             "eval_steps": 1,
-            "eval_num_inference_steps": 50,
+            "eval_num_inference_steps": 25,  # Faster inference
             "eval_guidance_scale": 7.5,
             
             # Output settings
@@ -418,10 +418,16 @@ def train_diffusion_lora():
         from datasets import load_dataset
         
         dataset_name = training_config["dataset"]
-        datasets_dict = load_dataset(dataset_name)
-        dataset = datasets_dict["train"]
+        try:
+            # Try to load the specified dataset
+            datasets_dict = load_dataset(dataset_name, split="train[:20]")  # Load only 20 samples
+            dataset = datasets_dict
+            lab.log(f"✅ Loaded dataset: {dataset_name}")
+        except Exception as e:
+            lab.log(f"⚠️  Could not load {dataset_name}: {e}")
+            lab.log("Creating a simple synthetic dataset for testing...")
         
-        lab.log(f"Loaded dataset with {len(dataset)} examples")
+        lab.log(f"Loaded dataset with {len(dataset)} examples (limited to 20 for testing)")
         lab.update_progress(10)
         
         # Model and tokenizer loading

@@ -318,7 +318,7 @@ def train_diffusion_lora():
     training_config = {
         "experiment_name": "stable-diffusion-lora-training",
         "model_name": "CompVis/stable-diffusion-v1-4",
-        "dataset": "reach-vb/pokemon-blip-captions",
+        "dataset": "nkasmanoff/nasa_earth_instagram",
         "output_dir": "./output",
         "log_to_wandb": True,
         "_config": {

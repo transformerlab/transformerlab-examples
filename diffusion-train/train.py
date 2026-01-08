@@ -320,7 +320,7 @@ def train_diffusion_lora():
         "model_name": "CompVis/stable-diffusion-v1-4",
         "dataset": "nkasmanoff/nasa_earth_instagram",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             # Model settings
             "model_architecture": "StableDiffusionPipeline",

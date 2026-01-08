@@ -16,5 +16,5 @@
     "num_train_epochs": "1",
     "learning_rate": "2e-5"
   },
-  "description": "A task to train YOLO model using ultralytics framework"
+  "description": "A task to train a language model using the TRL library on a specified dataset with evaluation done using the EleutherAI Harness."
 }

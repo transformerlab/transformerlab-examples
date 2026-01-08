@@ -26,7 +26,7 @@ class Net(nn.Module):
         return F.log_softmax(x, dim=1)
 
 # Training function
-def train(model, device, train_loader, optimizer, epoch, training_config):
+def train(model, device, train_loader, optimizer, epoch, log_interval):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
@@ -35,7 +35,7 @@ def train(model, device, train_loader, optimizer, epoch, training_config):
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
-        if batch_idx % training_config["_config"]["log_interval"] == 0:
+        if batch_idx % log_interval == 0:
             lab.log(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
             lab.update_progress((epoch - 1) * len(train_loader) + batch_idx)
 
@@ -82,54 +82,47 @@ def visualize_predictions(images, predictions):
 
 def main():
     try:
-        # Initialize lab and set configuration
-        # Training configuration
-        training_config = {
-            "model_name": "mnist_cnn",
-            "dataset": "MNIST",
-            "task": "classification",
-            "output_dir": "./mnist_output",
-            "_config": {
-                "epochs": 1,
-                "batch_size": 64,
-                "test_batch_size": 1000,
-                "learning_rate": 0.01,
-                "momentum": 0.5,
-                "device": "cpu",
-                "seed": 42,
-                "log_interval": 10,
-            },
-        }
+        # Initialize lab and get configuration
         lab.init()
-        lab.set_config(training_config)
+        config = lab.get_config()
+
+        # Extract parameters with defaults
+        model_name = config.get("model_name", "mnist_cnn")
+        device = torch.device(config.get("device", "cpu"))
+        seed = config.get("seed", 42)
+        epochs = config.get("epochs", 1)
+        batch_size = config.get("batch_size", 64)
+        test_batch_size = config.get("test_batch_size", 1000)
+        learning_rate = config.get("learning_rate", 0.01)
+        momentum = config.get("momentum", 0.5)
+        log_interval = config.get("log_interval", 10)
 
         # Set random seed for reproducibility
-        torch.manual_seed(training_config["_config"]["seed"])
-        device = torch.device(training_config["_config"]["device"])
+        torch.manual_seed(seed)
 
         # Load MNIST dataset
         train_loader = torch.utils.data.DataLoader(
             datasets.MNIST('./data', train=True, download=True, transform=transforms.ToTensor()),
-            batch_size=training_config["_config"]["batch_size"],
+            batch_size=batch_size,
             shuffle=True,
         )
         test_loader = torch.utils.data.DataLoader(
             datasets.MNIST('./data', train=False, transform=transforms.ToTensor()),
-            batch_size=training_config["_config"]["test_batch_size"],
+            batch_size=test_batch_size,
             shuffle=False,
         )
 
         # Initialize model, optimizer, and loss function
         model = Net().to(device)
-        optimizer = optim.SGD(model.parameters(), lr=training_config["_config"]["learning_rate"], momentum=training_config["_config"]["momentum"])
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
         # Evaluate before training
         lab.log("Evaluating before training...")
         test(model, device, test_loader, visualize=True)
 
         # Training loop
-        for epoch in range(1, training_config["_config"]["epochs"] + 1):
-            train(model, device, train_loader, optimizer, epoch, training_config=training_config)
+        for epoch in range(1, epochs + 1):
+            train(model, device, train_loader, optimizer, epoch, log_interval)
             test(model, device, test_loader)
 
         # Ensure the directory exists before saving the model
@@ -137,9 +130,9 @@ def main():
         os.makedirs(model_dir, exist_ok=True)
 
         # Save the model
-        model_path = os.path.join(model_dir, f"{training_config['model_name']}.pt")
+        model_path = os.path.join(model_dir, f"{model_name}.pt")
         torch.save(model.state_dict(), model_path)
-        lab.save_model(model_path, training_config["model_name"])
+        lab.save_model(model_path, model_name)
         lab.log(f"Model saved to {model_path}")
 
         # Visualize predictions after training

@@ -1,0 +1,20 @@
+{
+  "title": "HF Training Task",
+  "name": "trl-train-task",
+  "command": "cd ~/trl-training-evals && python train.py",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install transformerlab datasets transformers torch wandb;\nsudo apt update;\nsudo apt install -y libgl1 libglib2.0-0;",
+  "env_vars": {
+    "WANDB_PROJECT": "trl-training-project",
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "<your_huggingface_token_here>"
+  },
+  "parameters": {
+    "model_name": "HuggingFaceTB/SmolLM-135M-Instruct",
+    "dataset": "Trelis/touch-rugby-rules",
+    "eval_task": "mmlu_abstract_algebra",
+    "num_train_epochs": "1",
+    "learning_rate": "2e-5"
+  },
+  "description": "A task to train YOLO model using ultralytics framework"
+}

@@ -4,6 +4,6 @@
   "command": "python ~/mnist-train-task/mnist_train.py",
   "cpus": "1",
   "memory": "4",
-  "setup": "uv pip install transformers torch torchvision wandb transformerlab;\nsudo apt update;\nsudo apt install -y libgl1 libglib2.0-0;",
+  "setup": "uv pip install transformers torch torchvision wandb transformerlab matlplotlib",
   "description": "A task to train a neural network on the MNIST dataset using PyTorch."
 }

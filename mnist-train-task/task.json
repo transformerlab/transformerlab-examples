@@ -8,6 +8,6 @@
   },
   "cpus": "1",
   "memory": "4",
-  "setup": "uv pip install torch torchvision wandb transformerlab matlplotlib",
+  "setup": "uv pip install torch torchvision wandb transformerlab matplotlib",
   "description": "A task to train a neural network on the MNIST dataset using PyTorch."
 }

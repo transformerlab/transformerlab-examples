@@ -36,11 +36,11 @@ def train(model, device, train_loader, optimizer, epoch, log_interval):
         loss.backward()
         optimizer.step()
         if batch_idx % log_interval == 0:
-            lab.log(f"Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
+            lab.log(f"📊 Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
             lab.update_progress((epoch - 1) * len(train_loader) + batch_idx)
 
 # Test function
-def test(model, device, test_loader, visualize=False):
+def test(model, device, test_loader, visualize=False, output_dir=None):
     model.eval()
     test_loss = 0
     correct = 0
@@ -60,25 +60,26 @@ def test(model, device, test_loader, visualize=False):
 
     test_loss /= len(test_loader.dataset)
     accuracy = 100. * correct / len(test_loader.dataset)
-    lab.log(f"Test set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({accuracy:.2f}%)")
+    lab.log(f"✅ Test set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({accuracy:.2f}%)")
 
     # Visualize predictions if requested
-    if visualize:
-        visualize_predictions(images[:10], predictions[:10])
+    if visualize and output_dir:
+        visualize_predictions(images[:10], predictions[:10], output_dir)
 
     return accuracy
 
 # Visualization function
-def visualize_predictions(images, predictions):
+def visualize_predictions(images, predictions, output_dir):
     fig, axes = plt.subplots(2, 5, figsize=(10, 5))
     for i, ax in enumerate(axes.flat):
         ax.imshow(images[i][0], cmap='gray')
         ax.set_title(f"Pred: {predictions[i][0]}")
         ax.axis('off')
     plt.tight_layout()
-    plt.savefig("predictions.png")
-    lab.log("Saved prediction visualization as predictions.png")
-    lab.save_artifact("predictions.png", "predictions.png")
+    predictions_path = os.path.join(output_dir, "predictions.png")
+    plt.savefig(predictions_path)
+    lab.log(f"🖼️ Saved prediction visualization as {predictions_path}")
+    lab.save_artifact(predictions_path, "predictions.png")
 
 def main():
     try:
@@ -96,11 +97,28 @@ def main():
         learning_rate = config.get("learning_rate", 0.01)
         momentum = config.get("momentum", 0.5)
         log_interval = config.get("log_interval", 10)
+        output_dir = config.get("output_dir", "./mnist_model")
+
+        # Log configuration details
+        lab.log("🚀 Starting MNIST training task...")
+        lab.log(f"📋 Model: {model_name}")
+        lab.log(f"📊 Device: {device}")
+        lab.log(f"🔧 Seed: {seed}")
+        lab.log(f"🔢 Epochs: {epochs}")
+        lab.log(f"📦 Batch size: {batch_size}")
+        lab.log(f"📦 Test batch size: {test_batch_size}")
+        lab.log(f"⚙️ Learning rate: {learning_rate}")
+        lab.log(f"⚙️ Momentum: {momentum}")
+        lab.log(f"📂 Output directory: {output_dir}")
 
         # Set random seed for reproducibility
         torch.manual_seed(seed)
 
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
+
         # Load MNIST dataset
+        lab.log("📥 Loading MNIST dataset...")
         train_loader = torch.utils.data.DataLoader(
             datasets.MNIST('./data', train=True, download=True, transform=transforms.ToTensor()),
             batch_size=batch_size,
@@ -111,38 +129,36 @@ def main():
             batch_size=test_batch_size,
             shuffle=False,
         )
+        lab.log("✅ MNIST dataset loaded successfully.")
 
         # Initialize model, optimizer, and loss function
         model = Net().to(device)
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
         # Evaluate before training
-        lab.log("Evaluating before training...")
-        test(model, device, test_loader, visualize=True)
+        lab.log("🔍 Evaluating model before training...")
+        test(model, device, test_loader, visualize=True, output_dir=output_dir)
 
         # Training loop
         for epoch in range(1, epochs + 1):
+            lab.log(f"🚀 Starting epoch {epoch}/{epochs}...")
             train(model, device, train_loader, optimizer, epoch, log_interval)
-            test(model, device, test_loader)
-
-        # Ensure the directory exists before saving the model
-        model_dir = os.path.join(os.path.expanduser("~"), ".transformerlab", "workspace", "models")
-        os.makedirs(model_dir, exist_ok=True)
+            test(model, device, test_loader, output_dir=output_dir)
 
         # Save the model
-        model_path = os.path.join(model_dir, f"{model_name}.pt")
+        model_path = os.path.join(output_dir, f"{model_name}.pt")
         torch.save(model.state_dict(), model_path)
         lab.save_model(model_path, model_name)
-        lab.log(f"Model saved to {model_path}")
+        lab.log(f"💾 Model saved to {model_path}")
 
         # Visualize predictions after training
-        lab.log("Visualizing predictions after training...")
-        test(model, device, test_loader, visualize=True)
+        lab.log("🔍 Visualizing predictions after training...")
+        test(model, device, test_loader, visualize=True, output_dir=output_dir)
 
-        lab.finish("Training completed successfully")
+        lab.finish("🎉 Training completed successfully!")
 
     except Exception as e:
-        lab.error(f"An error occurred: {e}")
+        lab.error(f"❌ An error occurred: {e}")
         raise
 
 if __name__ == "__main__":

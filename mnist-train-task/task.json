@@ -3,7 +3,7 @@
   "name": "mnist-train-task",
   "command": "python ~/mnist-train-task/mnist_train.py",
   "env_vars": {
-    "WANDB_PROJECT": "trl-training-project",
+    "WANDB_PROJECT": "mnist-training-project",
     "PYTHONUNBUFFERED": "1"
   },
   "cpus": "1",

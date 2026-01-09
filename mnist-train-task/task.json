@@ -2,6 +2,10 @@
   "title": "MNIST Train Task",
   "name": "mnist-train-task",
   "command": "python ~/mnist-train-task/mnist_train.py",
+  "env_vars": {
+    "WANDB_PROJECT": "trl-training-project",
+    "PYTHONUNBUFFERED": "1"
+  },
   "cpus": "1",
   "memory": "4",
   "setup": "uv pip install torch torchvision wandb transformerlab matlplotlib",

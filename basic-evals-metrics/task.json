@@ -1,0 +1,20 @@
+{
+  "title": "Basic Evaluation Metrics",
+  "name": "basic-evals-metrics",
+  "command": "cd ~/basic-evals-metrics && python train.py",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install transformerlab datasets pandas RestrictedPython==8.0.0;",
+  "env_vars": {
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "<your_huggingface_token_here>"
+  },
+  "parameters": {
+    "dataset_name": "your_dataset_name",
+    "input_col": "input",
+    "output_col": "output",
+    "limit": "1.0",
+    "predefined_tasks": "",
+    "tasks": "[]"
+  },
+  "description": "Evaluating outputs of LLMs using basic defined metrics including regex patterns, word counts, and custom Python code."
+}

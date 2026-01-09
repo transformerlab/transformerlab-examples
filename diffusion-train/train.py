@@ -49,7 +49,6 @@ def cleanup_pipeline():
     except Exception as e:
         print(f"Warning: Failed to cleanup pipeline: {str(e)}")
 
-
 cleanup_pipeline()
 
 

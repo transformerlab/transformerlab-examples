@@ -1,0 +1,25 @@
+{
+  "title": "DPO / ORPO / SIMPO RLHF Training - Llama Factory",
+  "name": "dpo-orpo-simpo-llama-factory-task",
+  "command": "cd ~/dpo-orpo-simpo-llama-factory && python train.py",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install transformerlab datasets transformers torch trl>=0.8.2 wandb pyyaml;cd ~/dpo-orpo-simpo-llama-factory && rm -rf LLaMA-Factory && git clone https://github.com/hiyouga/LLaMA-Factory.git && cd LLaMA-Factory && git checkout beec77a0898a39d94f41c23920415f5b4873a23a && uv pip install -e .[torch,metrics]",
+  "env_vars": {
+    "WANDB_PROJECT": "llama-factory-dpo-training",
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "<your_huggingface_token_here>",
+    "WANDB_API_KEY": "<your_wandb_api_key_here>"
+  },
+  "parameters": {
+    "model_name": "meta-llama/Llama-3.2-1B-Instruct",
+    "dataset": "Intel/orca_dpo_pairs",
+    "pref_loss": "dpo",
+    "learning_rate": "5e-5",
+    "num_train_epochs": "1",
+    "max_steps": "-1",
+    "batch_size": "2",
+    "gradient_accumulation_steps": "4",
+    "template": "llama3"
+  },
+  "description": "An implementation of several Preference Optimization methods (DPO, ORPO, SIMPO) using Llama Factory. These methods allow for preference optimization without the need for a reward model."
+}

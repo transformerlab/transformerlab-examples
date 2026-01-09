@@ -3,7 +3,7 @@
   "name": "dpo-orpo-simpo-llama-factory-task",
   "command": "cd ~/dpo-orpo-simpo-llama-factory && python train.py",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install transformerlab datasets transformers torch trl>=0.8.2 wandb pyyaml;cd ~/dpo-orpo-simpo-llama-factory && rm -rf LLaMA-Factory && git clone https://github.com/hiyouga/LLaMA-Factory.git && cd LLaMA-Factory && git checkout beec77a0898a39d94f41c23920415f5b4873a23a && uv pip install -e .[torch,metrics]",
+  "setup": "uv pip install transformerlab datasets transformers torch trl>=0.8.2 wandb pyyaml; git clone https://github.com/hiyouga/LLaMA-Factory.git && cd LLaMA-Factory && git checkout beec77a0898a39d94f41c23920415f5b4873a23a && uv pip install -e .[torch,metrics]",
   "env_vars": {
     "WANDB_PROJECT": "llama-factory-dpo-training",
     "PYTHONUNBUFFERED": "1",
@@ -11,12 +11,12 @@
     "WANDB_API_KEY": "<your_wandb_api_key_here>"
   },
   "parameters": {
-    "model_name": "meta-llama/Llama-3.2-1B-Instruct",
+    "model_name": "HuggingFaceTB/SmolLM-135M-Instruct",
     "dataset": "Intel/orca_dpo_pairs",
     "pref_loss": "dpo",
     "learning_rate": "5e-5",
     "num_train_epochs": "1",
-    "max_steps": "-1",
+    "max_steps": "5",
     "batch_size": "2",
     "gradient_accumulation_steps": "4",
     "template": "llama3"

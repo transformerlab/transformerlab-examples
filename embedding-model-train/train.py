@@ -341,7 +341,7 @@ def train_embedding_model():
             warmup_ratio=warmup_ratio,
             learning_rate=learning_rate,
             load_best_model_at_end=False,
-            eval_strategy="epoch" if has_evaluator else "no",
+            evaluation_strategy="epoch" if has_evaluator else "no",
             save_strategy="epoch",
             logging_steps=10,
             save_total_limit=2,

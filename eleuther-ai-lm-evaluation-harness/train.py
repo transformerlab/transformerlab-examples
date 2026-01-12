@@ -274,9 +274,6 @@ def run_evaluation():
                             if acc_key:
                                 acc_value = task_results.get(acc_key, 0.0)
                                 lab.log(f"✅ {task_name}: {acc_key} = {acc_value}")
-                                
-                                # Log metric to TensorBoard
-                                lab.log_metric(f"{task_name}/{acc_key}", acc_value)
 
                             # Save aggregated metrics as eval artifact
                             saved_metrics_path = lab.save_artifact(

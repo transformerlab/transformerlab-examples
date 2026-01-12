@@ -9,5 +9,5 @@
   "cpus": "1",
   "memory": "4",
   "setup": "uv pip install torch torchvision wandb transformerlab matplotlib",
-  "description": "A task to train a neural network on the MNIST dataset using PyTorch."
+  "description": "A task to train a neural network on the MNIST handrwritten digits dataset using PyTorch."
 }

@@ -206,6 +206,8 @@ def run_objective_evaluation():
         threshold = float(config.get("threshold", 0.5))
         limit = float(config.get("limit", 1.0))
         dataset_split = config.get("dataset_split", "train")
+        output = config.get("output", "./output")
+        os.makedirs(output, exist_ok=True)
 
         # Parse tasks parameter
         if isinstance(tasks_param, str):
@@ -442,8 +444,12 @@ def run_objective_evaluation():
                 }
 
         # Save summary as artifact
+        summary_file_path = os.path.join(output, "evaluation_summary.json")
+        with open(summary_file_path, "w") as f:
+            json.dump(summary["metrics"], f, indent=2)
+        
         summary_path = lab.save_artifact(
-            summary["metrics"],
+            summary_file_path,
             name="evaluation_summary.json",
             type="json",
         )

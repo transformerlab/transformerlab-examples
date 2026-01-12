@@ -1,7 +1,7 @@
 {
   "title": "MNIST Train Task",
-  "name": "mnist-train-task",
-  "command": "python ~/mnist-train-task/mnist_train.py",
+  "name": "mnist-train",
+  "command": "python ~/mnist-train/mnist_train.py",
   "env_vars": {
     "WANDB_PROJECT": "mnist-training-project",
     "PYTHONUNBUFFERED": "1"

@@ -167,8 +167,7 @@ def train_embedding_model():
         num_train_epochs_raw = config.get("num_train_epochs", 3)
         num_train_epochs = int(num_train_epochs_raw) if isinstance(num_train_epochs_raw, (str, int, float)) else num_train_epochs_raw
 
-        max_steps_raw = config.get("max_steps", -1)
-        max_steps = int(max_steps_raw) if isinstance(max_steps_raw, (str, int, float)) else max_steps_raw
+        max_steps = config.get("max_steps", -1)
 
         batch_size_raw = config.get("batch_size", 16)
         batch_size = int(batch_size_raw) if isinstance(batch_size_raw, (str, int, float)) else batch_size_raw

@@ -443,9 +443,9 @@ def run_objective_evaluation():
 
         # Save summary as artifact
         summary_path = lab.save_artifact(
-            pd.DataFrame([summary["metrics"]]),
-            name="evaluation_summary.csv",
-            type="eval",
+            summary["metrics"],
+            name="evaluation_summary.json",
+            type="json",
         )
         lab.log(f"✅ Saved evaluation summary: {summary_path}")
 

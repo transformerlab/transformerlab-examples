@@ -167,6 +167,9 @@ def train_embedding_model():
         num_train_epochs_raw = config.get("num_train_epochs", 3)
         num_train_epochs = int(num_train_epochs_raw) if isinstance(num_train_epochs_raw, (str, int, float)) else num_train_epochs_raw
 
+        max_steps_raw = config.get("max_steps", -1)
+        max_steps = int(max_steps_raw) if isinstance(max_steps_raw, (str, int, float)) else max_steps_raw
+
         batch_size_raw = config.get("batch_size", 16)
         batch_size = int(batch_size_raw) if isinstance(batch_size_raw, (str, int, float)) else batch_size_raw
 
@@ -199,6 +202,8 @@ def train_embedding_model():
         lab.log(f"Learning rate: {learning_rate}")
         lab.log(f"Batch size: {batch_size}")
         lab.log(f"Number of epochs: {num_train_epochs}")
+        lab.log(f"Max steps: {max_steps}")
+        lab.log(f"Max samples: {max_samples}")
         lab.log(f"Using GPU: {os.environ.get('CUDA_VISIBLE_DEVICES', 'All available')}")
 
         # Validate loss function against dataset type
@@ -330,6 +335,7 @@ def train_embedding_model():
             output_dir=output_dir,
             logging_dir=os.path.join(output_dir, "logs"),
             num_train_epochs=num_train_epochs,
+            max_steps=max_steps if max_steps > 0 else None,
             per_device_train_batch_size=batch_size,
             fp16=fp16,
             bf16=bf16,

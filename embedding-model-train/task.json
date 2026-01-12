@@ -12,7 +12,7 @@
 
   "parameters": {
     "model_name": "sentence-transformers/paraphrase-MiniLM-L3-v2",
-    "dataset": "sentence-transformers/stsb",
+    "dataset_name": "sentence-transformers/stsb",
     "dataset_type": "anchor | positive",
     "loss_function": "MultipleNegativesRankingLoss",
     "num_train_epochs": "1",

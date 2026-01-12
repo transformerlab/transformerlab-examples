@@ -9,9 +9,9 @@
     "HF_TOKEN": "<your_huggingface_token_here>"
   },
   "parameters": {
-    "dataset_name": "your_dataset_name",
-    "input_col": "input",
-    "output_col": "output",
+    "dataset_name": "openai/gsm8k",
+    "input_col": "question",
+    "output_col": "answer",
     "limit": "1.0",
     "predefined_tasks": "",
     "tasks": "[]"

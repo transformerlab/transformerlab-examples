@@ -277,7 +277,7 @@ def run_evaluation():
         try:
             from datasets import load_dataset
 
-            dataset = load_dataset(dataset_name, split="train")
+            dataset = load_dataset(dataset_name,'main', split="train")
             df = dataset["train"].to_pandas()
             lab.log("Dataset loaded successfully")
         except Exception as e:

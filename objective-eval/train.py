@@ -445,6 +445,7 @@ def run_objective_evaluation():
         summary_path = lab.save_artifact(
             pd.DataFrame([summary["metrics"]]),
             name="evaluation_summary.csv",
+            type="eval",
         )
         lab.log(f"✅ Saved evaluation summary: {summary_path}")
 

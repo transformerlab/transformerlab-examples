@@ -211,11 +211,11 @@ def run_evaluation():
         config = lab.get_config()
 
         # Extract parameters with defaults
-        dataset_name = config.get("dataset_name", "your_dataset_name")
-        input_col = config.get("input_col", "input")
-        output_col = config.get("output_col", "output")
+        dataset_name = config.get("dataset_name", "openai/gsm8k")
+        input_col = config.get("input_col", "question")
+        output_col = config.get("output_col", "answer")
         limit = config.get("limit", 1.0)
-        predefined_tasks_param = config.get("predefined_tasks", "")
+        predefined_tasks_param = config.get("predefined_tasks", "Word Count,Is Valid JSON,Contains code blocks")
         tasks_param = config.get("tasks", "[]")
 
         # Convert string values to appropriate types

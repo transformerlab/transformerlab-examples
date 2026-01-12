@@ -3,7 +3,7 @@
   "name": "embedding-model-train-task",
   "command": "cd ~/embedding-model-train && python train.py",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install transformerlab sentence-transformers datasets torch",
+  "setup": "uv pip install transformerlab sentence-transformers datasets==2.14.4 torch 'pyarrow<15.0' 'numpy<2.0'",
   "env_vars": {
     "WANDB_PROJECT": "embedding-model-training",
     "PYTHONUNBUFFERED": "1",

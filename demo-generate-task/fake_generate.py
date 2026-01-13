@@ -81,13 +81,6 @@ def generate_dataset():
         generation_duration = end_time - start_time
         lab.log(f"Dataset generation completed in {generation_duration}")
 
-        # Get generated dataset from job data
-        job_data = lab.job.get_job_data()
-        generated_datasets = job_data.get("generated_datasets", [])
-
-        if generated_datasets:
-            lab.log(f"Generated dataset: {generated_datasets[0]}")
-
         lab.update_progress(100)
 
         print("Dataset Generation Complete")
@@ -97,7 +90,6 @@ def generate_dataset():
             "Dataset generation completed successfully",
             score={
                 "total_samples": len(df),
-                "dataset_id": generated_datasets[0] if generated_datasets else None,
             },
         )
 
@@ -105,7 +97,6 @@ def generate_dataset():
             "status": "success",
             "job_id": lab.job.id,
             "duration": str(generation_duration),
-            "generated_dataset": generated_datasets[0] if generated_datasets else None,
             "total_samples": len(df),
         }
 

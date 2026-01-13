@@ -509,11 +509,6 @@ def train_model():
         saved_path = lab.save_model(model_dir, name="grpo_multi_gpu_trained_model")
         lab.log(f"✅ Model saved to job models directory: {saved_path}")
 
-        # Get the captured wandb URL from job data for reporting
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Final wandb URL stored in job data: {captured_wandb_url}")
-
         # Finish wandb run if it was initialized
         try:
             import wandb
@@ -535,7 +530,6 @@ def train_model():
             "duration": str(training_duration),
             "output_dir": output_dir,
             "saved_model_path": saved_path,
-            "wandb_url": captured_wandb_url,
             "trainer_type": "Multi-GPU GRPO",
             "num_gpus": accelerator.num_processes,
             "device": str(accelerator.device),

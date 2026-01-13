@@ -466,11 +466,6 @@ def train_with_llama_factory():
         except Exception as e:
             lab.log(f"⚠️  Error saving artifacts: {e}")
 
-        # Get wandb URL if available
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Wandb URL: {captured_wandb_url}")
-
         # Finish wandb run if it was initialized
         try:
             import wandb
@@ -489,7 +484,6 @@ def train_with_llama_factory():
             "duration": str(training_duration),
             "output_dir": output_dir,
             "preference_method": pref_loss,
-            "wandb_url": captured_wandb_url,
         }
 
     except KeyboardInterrupt:

@@ -49,7 +49,6 @@ def cleanup_pipeline():
     except Exception as e:
         print(f"Warning: Failed to cleanup pipeline: {str(e)}")
 
-
 cleanup_pipeline()
 
 
@@ -1088,7 +1087,7 @@ def train_diffusion_lora():
         lab.log(f"Training completed in {training_duration}")
         
         # Create training summary
-        summary = {
+        summary_data = {
             "training_type": "Stable Diffusion LoRA",
             "model_name": pretrained_model_name_or_path,
             "architecture": architecture_name,
@@ -1104,11 +1103,11 @@ def train_diffusion_lora():
             "completed_at": end_time.isoformat(),
         }
         
-        summary_file = os.path.join(output_dir, "training_summary.json")
-        with open(summary_file, "w") as f:
-            json.dump(summary, f, indent=2)
+        summary_file_path = os.path.join(output_dir, "training_summary.json")
+        with open(summary_file_path, "w") as f:
+            json.dump(summary_data, f, indent=2)
         
-        artifact_path = lab.save_artifact(summary_file, "training_summary.json")
+        artifact_path = lab.save_artifact(summary_file_path, "training_summary.json")
         lab.log(f"✅ Training summary saved as artifact: {artifact_path}")
         
         lab.update_progress(100)

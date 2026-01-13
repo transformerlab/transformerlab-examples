@@ -9,7 +9,8 @@
   "env_vars": {
     "WANDB_PROJECT": "unsloth-llm-training",
     "PYTHONUNBUFFERED": "1",
-    "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE"
+    "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
+    "WANDB_API_KEY": "ENTER YOUR WANDB_API_KEY HERE"
   },
   "description": "LLM training task using Unsloth FastLanguageModel with LoRA fine-tuning. Requires a Hugging Face token in HF_TOKEN env var for model access."
 }

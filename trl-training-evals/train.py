@@ -534,11 +534,6 @@ def train_with_trl():
         saved_path = lab.save_model(saved_model_path, name="trained_model")
         lab.log(f"✅ Model saved to job models directory: {saved_path}")
 
-        # Get the captured wandb URL from job data for reporting
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Final wandb URL stored in job data: {captured_wandb_url}")
-
         # Finish wandb run if it was initialized
         try:
             import wandb
@@ -560,7 +555,6 @@ def train_with_trl():
             "duration": str(training_duration),
             "output_dir": output_dir,
             "saved_model_path": saved_path,
-            "wandb_url": captured_wandb_url,
             "trainer_type": "SFTTrainer",
             "gpu_used": os.environ.get("CUDA_VISIBLE_DEVICES", "all"),
         }

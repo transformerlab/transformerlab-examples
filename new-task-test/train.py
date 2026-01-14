@@ -158,10 +158,6 @@ def train():
 
         config_artifact_path = lab.save_artifact(config_file, "training_config.json")
         lab.log(f"Saved training config: {config_artifact_path}")
-        # Get the captured wandb URL from job data for reporting
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Final wandb URL stored in job data: {captured_wandb_url}")
 
         # Finish wandb run if it was initialized
         try:
@@ -197,7 +193,6 @@ def train():
             "duration": str(training_duration),
             "output_dir": os.path.join(training_config["output_dir"], f"final_model_{lab.job.id}"),
             "saved_model_path": saved_path,
-            "wandb_url": captured_wandb_url,
         }
 
     except KeyboardInterrupt:

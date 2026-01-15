@@ -2,8 +2,6 @@
   "title": "Unsloth LLM Training Task",
   "name": "unsloth-llm-train-task",
   "command": "cd ~/unsloth-llm-train && python train.py",
-  "cpus": "2",
-  "memory": "4",
   "accelerators": "RTX3090:1",
   "setup": "uv pip install unsloth==2025.12.5 transformers datasets huggingface-hub torch transformerlab wandb",
   "env_vars": {

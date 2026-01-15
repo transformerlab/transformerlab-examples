@@ -342,6 +342,11 @@ def train_model():
 
             tokenizer = AutoTokenizer.from_pretrained(model_id)
             tokenizer.padding_side = "right"
+            
+            # Set chat template for SmolLM2 if not present
+            if tokenizer.chat_template is None:
+                tokenizer.chat_template = "{% for message in messages %}{{ message['role'] }}: {{ message['content'] }}\n{% endfor %}assistant: "
+            
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 torch_dtype=torch.bfloat16,

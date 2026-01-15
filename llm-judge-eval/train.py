@@ -159,15 +159,38 @@ def run_evaluation():
                     lab.log(f"Import error: {import_err}")
                     raise ImportError(error_msg)
                 
+                # Check if accelerate is available for device_map support
+                try:
+                    import accelerate
+                    has_accelerate = True
+                except ImportError:
+                    has_accelerate = False
+                    lab.log("Note: accelerate not installed, using default device placement")
+                
                 # Create a custom DeepEval model wrapper
                 class LocalLLM(DeepEvalBaseLLM):
                     def __init__(self, model_name):
                         self.model_name = model_name
+                        
+                        # Prepare model loading arguments
+                        model_kwargs = {
+                            "dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
+                        }
+                        
+                        # Only use device_map if accelerate is available
+                        if has_accelerate:
+                            model_kwargs["device_map"] = "auto"
+                        
                         self.model = AutoModelForCausalLM.from_pretrained(
                             model_name,
-                            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                            device_map="auto"
+                            **model_kwargs
                         )
+                        
+                        # Move model to device if accelerate is not available
+                        if not has_accelerate:
+                            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                            self.model = self.model.to(device)
+                        
                         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
                         if self.tokenizer.pad_token is None:
                             self.tokenizer.pad_token = self.tokenizer.eos_token

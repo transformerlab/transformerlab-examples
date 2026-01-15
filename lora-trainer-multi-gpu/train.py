@@ -60,10 +60,10 @@ def train_with_lora():
 
         # Extract parameters with defaults
         # All these can be set in the UI when creating/launching the task
-        model_name = config.get("model_name", "meta-llama/Llama-2-7b-hf")
+        model_name = config.get("model_name", "HuggingFaceTB/SmolLM2-135M")
         dataset_name = config.get("dataset", "Trelis/touch-rugby-rules")
         output_dir = config.get("output_dir", "./output")
-        log_to_wandb = config.get("log_to_wandb", True)
+        log_to_wandb = config.get("log_to_wandb", False)
         fuse_model = config.get("fuse_model", False)
 
         # LoRA configuration
@@ -86,7 +86,7 @@ def train_with_lora():
         warmup_ratio = config.get("warmup_ratio", 0.03)
         weight_decay = config.get("weight_decay", 0.01)
         learning_rate_schedule = config.get("learning_rate_schedule", "constant")
-        max_steps = config.get("max_steps", -1)
+        max_steps = config.get("max_steps", 5)
 
         # Device configuration
         train_device = config.get("train_device", "cuda")

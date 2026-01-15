@@ -58,7 +58,7 @@ def run_evaluation():
         config = lab.get_config()
 
         # Extract parameters with defaults
-        dataset_name = config.get("dataset", "rajpurkar/squad")
+        dataset_name = config.get("dataset", None)
         dataset_split = config.get("dataset_split", "train")
         generation_model = config.get("generation_model", "HuggingFaceTB/SmolLM2-135M")
         predefined_tasks_raw = config.get("predefined_tasks", "[]")
@@ -240,14 +240,33 @@ def run_evaluation():
                 df = dataset_dict[dataset_split].to_pandas()
                 lab.log(f"Dataset loaded successfully: {len(df)} examples")
             else:
-                lab.log("No dataset specified, using a sample dataset")
-                # Create a sample dataset for testing
-                df = pd.DataFrame({
-                    "input": ["What is the capital of France?", "Explain quantum computing"],
-                    "output": ["Paris is the capital of France.", "Quantum computing uses quantum mechanics."],
-                    "expected_output": ["Paris", "Quantum computing is a type of computing that uses quantum-mechanical phenomena."]
-                })
-                lab.log(f"Using sample dataset: {len(df)} examples")
+                lab.log("⚠️ No dataset specified. Creating sample dataset with 5 examples...")
+                # Create a sample dataset with 5 datapoints
+                sample_data = {
+                    "input": [
+                        "What is the capital of France?",
+                        "Explain quantum computing",
+                        "What is the largest planet in our solar system?",
+                        "Define machine learning in simple terms",
+                        "What is the chemical symbol for gold?"
+                    ],
+                    "output": [
+                        "Paris is the capital of France.",
+                        "Quantum computing uses quantum mechanics principles to process information.",
+                        "Jupiter is the largest planet in our solar system.",
+                        "Machine learning is a type of artificial intelligence that learns from data.",
+                        "The chemical symbol for gold is Au."
+                    ],
+                    "expected_output": [
+                        "Paris",
+                        "Quantum computing leverages quantum mechanical phenomena like superposition and entanglement.",
+                        "Jupiter",
+                        "Machine learning enables computers to learn from examples without explicit programming.",
+                        "Au"
+                    ]
+                }
+                df = pd.DataFrame(sample_data)
+                lab.log(f"✅ Created sample dataset with {len(df)} examples")
         except Exception as e:
             lab.log(f"Error loading dataset: {e}")
             traceback.print_exc()

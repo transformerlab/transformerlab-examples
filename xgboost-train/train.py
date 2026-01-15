@@ -60,7 +60,7 @@ def load_dataset(dataset_name):
     return X, y
 
 
-def train_xgboost_classifier(X_train, y_train, X_val, y_val, config):
+def train_xgboost_classifier(X_train, y_train, X_val, y_val, config, output_dir):
     """Train XGBoost classifier with specified parameters"""
     lab.log("Setting up XGBoost classifier...")
     
@@ -112,6 +112,21 @@ def train_xgboost_classifier(X_train, y_train, X_val, y_val, config):
     evals = [(dtrain, "train"), (dval, "validation")]
     evals_result = {}
     
+    # Create checkpoint callback
+    def save_checkpoint_callback(env):
+        """Callback to save checkpoints during training"""
+        if env.iteration % 10 == 0:  # Save every 10 iterations
+            checkpoint_path = os.path.join(output_dir, f"checkpoint_{env.iteration}.pkl")
+            try:
+                # Save the model using pickle for consistency
+                with open(checkpoint_path, "wb") as f:
+                    pickle.dump(env.model, f)
+                # Save to TransformerLab
+                lab_checkpoint_path = lab.save_checkpoint(checkpoint_path, f"checkpoint_{env.iteration}")
+                lab.log(f"💾 Checkpoint saved at iteration {env.iteration}: {lab_checkpoint_path}")
+            except Exception as e:
+                lab.log(f"⚠️  Failed to save checkpoint at iteration {env.iteration}: {e}")
+    
     lab.log("Starting training...")
     model = xgb.train(
         params,
@@ -121,6 +136,7 @@ def train_xgboost_classifier(X_train, y_train, X_val, y_val, config):
         evals_result=evals_result,
         early_stopping_rounds=10,
         verbose_eval=10,
+        callbacks=[save_checkpoint_callback],
     )
     
     lab.log("✅ Training completed")
@@ -236,7 +252,7 @@ def save_training_report(model, eval_results, test_metrics, output_dir, config, 
         },
         "model_info": {
             "n_trees": model.num_boosted_rounds(),
-            "max_depth": model.get_params().get("max_depth", "N/A"),
+            "max_depth": config.get("max_depth", "N/A"),
         }
     }
     
@@ -334,7 +350,7 @@ def main():
         if not checkpoint:
             # Train model
             lab.log("🎯 Training XGBoost model...")
-            model, evals_result = train_xgboost_classifier(X_train, y_train, X_val, y_val, config)
+            model, evals_result = train_xgboost_classifier(X_train, y_train, X_val, y_val, config, output_dir)
             lab.update_progress(70)
         else:
             lab.log("Using loaded checkpoint model")

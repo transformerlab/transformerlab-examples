@@ -130,7 +130,7 @@ def train_with_unsloth():
         "dataset": "Trelis/touch-rugby-rules",  # Example dataset
         "template_name": "unsloth-demo",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             "dataset_name": "Trelis/touch-rugby-rules",
             "lr": 2e-4,

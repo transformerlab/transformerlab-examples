@@ -112,20 +112,24 @@ def train_xgboost_classifier(X_train, y_train, X_val, y_val, config, output_dir)
     evals = [(dtrain, "train"), (dval, "validation")]
     evals_result = {}
     
-    # Create checkpoint callback
-    def save_checkpoint_callback(env):
-        """Callback to save checkpoints during training"""
-        if env.iteration % 10 == 0:  # Save every 10 iterations
-            checkpoint_path = os.path.join(output_dir, f"checkpoint_{env.iteration}.pkl")
-            try:
-                # Save the model using pickle for consistency
-                with open(checkpoint_path, "wb") as f:
-                    pickle.dump(env.model, f)
-                # Save to TransformerLab
-                lab_checkpoint_path = lab.save_checkpoint(checkpoint_path, f"checkpoint_{env.iteration}")
-                lab.log(f"💾 Checkpoint saved at iteration {env.iteration}: {lab_checkpoint_path}")
-            except Exception as e:
-                lab.log(f"⚠️  Failed to save checkpoint at iteration {env.iteration}: {e}")
+    # Create checkpoint callback using XGBoost's TrainingCallback
+    class CheckpointCallback(xgb.callback.TrainingCallback):
+        """Custom callback to save checkpoints during training"""
+        
+        def after_iteration(self, model, epoch, evals_log):
+            """Called after each iteration"""
+            if epoch % 10 == 0:  # Save every 10 iterations
+                checkpoint_path = os.path.join(output_dir, f"checkpoint_{epoch}.pkl")
+                try:
+                    # Save the model using pickle for consistency
+                    with open(checkpoint_path, "wb") as f:
+                        pickle.dump(model, f)
+                    # Save to TransformerLab
+                    lab_checkpoint_path = lab.save_checkpoint(checkpoint_path, f"checkpoint_{epoch}")
+                    lab.log(f"💾 Checkpoint saved at iteration {epoch}: {lab_checkpoint_path}")
+                except Exception as e:
+                    lab.log(f"⚠️  Failed to save checkpoint at iteration {epoch}: {e}")
+            return False  # Continue training
     
     lab.log("Starting training...")
     model = xgb.train(
@@ -136,7 +140,7 @@ def train_xgboost_classifier(X_train, y_train, X_val, y_val, config, output_dir)
         evals_result=evals_result,
         early_stopping_rounds=10,
         verbose_eval=10,
-        callbacks=[save_checkpoint_callback],
+        callbacks=[CheckpointCallback()],
     )
     
     lab.log("✅ Training completed")

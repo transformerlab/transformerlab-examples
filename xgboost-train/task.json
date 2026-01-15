@@ -1,0 +1,25 @@
+{
+  "title": "XGBoost Training Task",
+  "name": "xgboost-train-task",
+  "command": "cd ~/xgboost-train && python train.py",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install transformerlab xgboost scikit-learn pandas numpy matplotlib wandb;",
+  "env_vars": {
+    "PYTHONUNBUFFERED": "1",
+    "WANDB_PROJECT": "xgboost-training",
+    "WANDB_API_KEY": "<your_wandb_api_key_here>"
+  },
+  "parameters": {
+    "dataset": "breast_cancer",
+    "test_size": "0.2",
+    "val_size": "0.1",
+    "max_depth": "6",
+    "learning_rate": "0.1",
+    "n_estimators": "100",
+    "subsample": "0.8",
+    "colsample_bytree": "0.8",
+    "lambda": "1.0",
+    "alpha": "0.0"
+  },
+  "description": "A task to train an XGBoost classifier on tabular data with TransformerLab integration. Supports multiple datasets (breast_cancer, iris, synthetic) with configurable hyperparameters. Includes automatic progress tracking, model checkpointing, feature importance visualization, and comprehensive evaluation metrics."
+}

@@ -383,17 +383,28 @@ def main():
         lab.log(f"✅ Model saved to {model_path}")
         
         # Save model to TransformerLab
-        saved_model_path = lab.save_model(model_path, name="xgboost_classifier")
-        lab.log(f"✅ Model saved to TransformerLab: {saved_model_path}")
+        saved_model_path = None
+        try:
+            saved_model_path = lab.save_model(model_path, name="xgboost_classifier")
+            lab.log(f"✅ Model saved to TransformerLab: {saved_model_path}")
+        except Exception as e:
+            lab.log(f"⚠️  Warning: Could not save model to TransformerLab: {e}")
+            saved_model_path = model_path
         
         # Save training report as artifact
-        lab.save_artifact(report_path, "training_report.json")
-        lab.log(f"✅ Training report saved as artifact")
+        try:
+            lab.save_artifact(report_path, "training_report.json")
+            lab.log(f"✅ Training report saved as artifact")
+        except Exception as e:
+            lab.log(f"⚠️  Warning: Could not save training report artifact: {e}")
         
         # Save feature importance plot as artifact
         if importance_plot:
-            lab.save_artifact(importance_plot, "feature_importance.png")
-            lab.log(f"✅ Feature importance plot saved as artifact")
+            try:
+                lab.save_artifact(importance_plot, "feature_importance.png")
+                lab.log(f"✅ Feature importance plot saved as artifact")
+            except Exception as e:
+                lab.log(f"⚠️  Warning: Could not save feature importance artifact: {e}")
         
         lab.update_progress(95)
         

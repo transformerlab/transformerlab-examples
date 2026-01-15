@@ -156,11 +156,11 @@ def train_model():
     # Training configuration
     training_config = {
         "experiment_name": "grpo-multi-gpu-training",
-        "model_name": "meta-llama/Llama-3.2-1B",  # Example model
+        "model_name": "unsloth/SmolLM2-135M",  # Example model
         "dataset": "openai/gsm8k",  # Example dataset for reasoning
         "template_name": "grpo-multi-gpu-demo",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             "dataset_name": "openai/gsm8k",
             "dataset_config": "main",
@@ -182,7 +182,7 @@ def train_model():
             "adam_beta1": 0.9,
             "adam_beta2": 0.999,
             "adam_epsilon": 1e-08,
-            "max_steps": -1,  # -1 means use num_train_epochs
+            "max_steps": 5,  # -1 means use num_train_epochs
             "train_device": "cuda",
             "gpu_ids": "auto",  # auto means use all available GPUs
             # Template configuration
@@ -389,7 +389,7 @@ def train_model():
             adam_epsilon=adam_epsilon,
             disable_tqdm=False,
             run_name=f"grpo_{run_suffix}",
-            report_to="wandb" if training_config.get("log_to_wandb", True) else "none",
+            report_to="wandb" if training_config.get("log_to_wandb", False) else "none",
             ddp_find_unused_parameters=False,
             dataloader_pin_memory=True,
             no_cuda=False,

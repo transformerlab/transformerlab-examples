@@ -937,11 +937,158 @@ def train_diffusion_lora():
             avg_epoch_loss = epoch_loss / len(train_dataloader)
             lab.log(f"✅ Epoch {epoch+1} completed - Average Loss: {avg_epoch_loss:.4f}")
             
+            # Save checkpoint at end of epoch
+            checkpoint_dir = os.path.join(output_dir, f"checkpoint_epoch_{epoch+1}")
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            
+            # Save LoRA state dict for checkpoint
+            checkpoint_lora_state_dict = convert_state_dict_to_diffusers(get_peft_model_state_dict(unet))
+            
+            # Save checkpoint info
+            checkpoint_info = {
+                "epoch": epoch + 1,
+                "global_step": global_step,
+                "avg_epoch_loss": avg_epoch_loss,
+                "model_architecture": model_architecture,
+                "lora_config": {
+                    "r": str(unet_lora_config.r),
+                    "lora_alpha": str(unet_lora_config.lora_alpha),
+                    "target_modules": str(unet_lora_config.target_modules),
+                },
+            }
+            
+            checkpoint_config_path = os.path.join(checkpoint_dir, "checkpoint_config.json")
+            with open(checkpoint_config_path, "w", encoding="utf-8") as f:
+                json.dump(checkpoint_info, f, indent=4)
+            
+            # Save LoRA weights for checkpoint
+            try:
+                if not is_sdxl and not is_sd3 and not is_flux:
+                    StableDiffusionPipeline.save_lora_weights(
+                        save_directory=checkpoint_dir,
+                        unet_lora_layers=checkpoint_lora_state_dict,
+                        safe_serialization=True,
+                    )
+                elif is_sdxl:
+                    from diffusers import StableDiffusionXLPipeline
+                    StableDiffusionXLPipeline.save_lora_weights(
+                        save_directory=checkpoint_dir,
+                        unet_lora_layers=checkpoint_lora_state_dict,
+                        text_encoder_lora_layers=None,
+                        text_encoder_2_lora_layers=None,
+                        safe_serialization=True,
+                    )
+                elif is_sd3:
+                    from diffusers import StableDiffusion3Pipeline
+                    StableDiffusion3Pipeline.save_lora_weights(
+                        save_directory=checkpoint_dir,
+                        unet_lora_layers=checkpoint_lora_state_dict,
+                        safe_serialization=True,
+                    )
+                elif is_flux:
+                    from diffusers import FluxPipeline
+                    try:
+                        FluxPipeline.save_lora_weights(
+                            save_directory=checkpoint_dir,
+                            transformer_lora_layers=checkpoint_lora_state_dict,
+                            safe_serialization=True,
+                        )
+                    except TypeError:
+                        FluxPipeline.save_lora_weights(
+                            save_directory=checkpoint_dir,
+                            unet_lora_layers=checkpoint_lora_state_dict,
+                            safe_serialization=True,
+                        )
+                else:
+                    from safetensors.torch import save_file
+                    save_file(checkpoint_lora_state_dict, os.path.join(checkpoint_dir, "pytorch_lora_weights.safetensors"))
+                
+                # Save checkpoint using lab
+                saved_checkpoint_path = lab.save_checkpoint(checkpoint_dir, f"checkpoint_epoch_{epoch+1}")
+                lab.log(f"✅ Checkpoint saved: {saved_checkpoint_path}")
+                
+            except Exception as e:
+                lab.log(f"⚠️  Failed to save checkpoint for epoch {epoch+1}: {e}")
+            
             if global_step >= max_train_steps:
                 break
         
         lab.log("✅ Training completed")
         lab.update_progress(90)
+        
+        # Save final checkpoint
+        final_checkpoint_dir = os.path.join(output_dir, "final_checkpoint")
+        os.makedirs(final_checkpoint_dir, exist_ok=True)
+        
+        # Save LoRA state dict for final checkpoint
+        final_checkpoint_lora_state_dict = convert_state_dict_to_diffusers(get_peft_model_state_dict(unet))
+        
+        # Save final checkpoint info
+        final_checkpoint_info = {
+            "epoch": num_train_epochs,
+            "global_step": global_step,
+            "final_loss": avg_epoch_loss if 'avg_epoch_loss' in locals() else 0.0,
+            "model_architecture": model_architecture,
+            "lora_config": {
+                "r": str(unet_lora_config.r),
+                "lora_alpha": str(unet_lora_config.lora_alpha),
+                "target_modules": str(unet_lora_config.target_modules),
+            },
+            "training_completed": True,
+        }
+        
+        final_checkpoint_config_path = os.path.join(final_checkpoint_dir, "checkpoint_config.json")
+        with open(final_checkpoint_config_path, "w", encoding="utf-8") as f:
+            json.dump(final_checkpoint_info, f, indent=4)
+        
+        # Save LoRA weights for final checkpoint
+        try:
+            if not is_sdxl and not is_sd3 and not is_flux:
+                StableDiffusionPipeline.save_lora_weights(
+                    save_directory=final_checkpoint_dir,
+                    unet_lora_layers=final_checkpoint_lora_state_dict,
+                    safe_serialization=True,
+                )
+            elif is_sdxl:
+                from diffusers import StableDiffusionXLPipeline
+                StableDiffusionXLPipeline.save_lora_weights(
+                    save_directory=final_checkpoint_dir,
+                    unet_lora_layers=final_checkpoint_lora_state_dict,
+                    text_encoder_lora_layers=None,
+                    text_encoder_2_lora_layers=None,
+                    safe_serialization=True,
+                )
+            elif is_sd3:
+                from diffusers import StableDiffusion3Pipeline
+                StableDiffusion3Pipeline.save_lora_weights(
+                    save_directory=final_checkpoint_dir,
+                    unet_lora_layers=final_checkpoint_lora_state_dict,
+                    safe_serialization=True,
+                )
+            elif is_flux:
+                from diffusers import FluxPipeline
+                try:
+                    FluxPipeline.save_lora_weights(
+                        save_directory=final_checkpoint_dir,
+                        transformer_lora_layers=final_checkpoint_lora_state_dict,
+                        safe_serialization=True,
+                    )
+                except TypeError:
+                    FluxPipeline.save_lora_weights(
+                        save_directory=final_checkpoint_dir,
+                        unet_lora_layers=final_checkpoint_lora_state_dict,
+                        safe_serialization=True,
+                    )
+            else:
+                from safetensors.torch import save_file
+                save_file(final_checkpoint_lora_state_dict, os.path.join(final_checkpoint_dir, "pytorch_lora_weights.safetensors"))
+            
+            # Save final checkpoint using lab
+            saved_final_checkpoint_path = lab.save_checkpoint(final_checkpoint_dir, "final_checkpoint")
+            lab.log(f"✅ Final checkpoint saved: {saved_final_checkpoint_path}")
+            
+        except Exception as e:
+            lab.log(f"⚠️  Failed to save final checkpoint: {e}")
         
         # Generate after_train images
         if eval_prompt:
@@ -1118,6 +1265,7 @@ def train_diffusion_lora():
             "duration": str(training_duration),
             "output_dir": output_dir,
             "saved_model_path": saved_model_path,
+            "saved_checkpoint_path": saved_final_checkpoint_path if 'saved_final_checkpoint_path' in locals() else None,
             "architecture": architecture_name,
         }
     

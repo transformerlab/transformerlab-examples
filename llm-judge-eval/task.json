@@ -3,7 +3,7 @@
   "name": "llm-judge-eval-task",
   "command": "cd ~/llm-judge-eval && python train.py",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install transformers torch deepeval langchain-openai instructor anthropic seaborn langchain langchain-community transformerlab datasets pandas",
+  "setup": "uv pip install transformers torch deepeval langchain-openai instructor anthropic seaborn langchain langchain-community transformerlab datasets==4.5.0 pandas",
   "env_vars": {
     "WANDB_PROJECT": "llm-judge-evaluation",
     "PYTHONUNBUFFERED": "1",

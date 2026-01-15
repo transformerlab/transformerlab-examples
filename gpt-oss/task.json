@@ -1,0 +1,26 @@
+{
+  "title": "GPT-OSS Training Task",
+  "name": "gpt-oss-train-task",
+  "command": "cd ~/gpt-oss && python train.py",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install transformerlab datasets transformers torch trl peft lm_eval==0.4.7;sudo apt update;sudo apt install -y libgl1 libglib2.0-0;",
+  "env_vars": {
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "<your_huggingface_token_here>"
+  },
+  "parameters": {
+    "model_name": "openai/gpt-oss-20b",
+    "dataset": "HuggingFaceH4/Multilingual-Thinking",
+    "output_dir": "./output",
+    "enable_lora": false,
+    "enable_profiling": false,
+    "num_train_epochs": "1",
+    "per_device_train_batch_size": "1",
+    "gradient_accumulation_steps": "1",
+    "learning_rate": "2e-4",
+    "warmup_ratio": "0.03",
+    "save_steps": "500",
+    "max_steps": "-1"
+  },
+  "description": "A task to train a GPT-OSS model using HuggingFace SFTTrainer with optional LoRA fine-tuning. Parameters can be configured in the UI when launching the task."
+}

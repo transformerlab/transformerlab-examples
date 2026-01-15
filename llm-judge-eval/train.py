@@ -58,9 +58,9 @@ def run_evaluation():
         config = lab.get_config()
 
         # Extract parameters with defaults
-        dataset_name = config.get("dataset", "")
+        dataset_name = config.get("dataset", "rajpurkar/squad")
         dataset_split = config.get("dataset_split", "train")
-        generation_model = config.get("generation_model", "gpt-4o-mini")
+        generation_model = config.get("generation_model", "HuggingFaceTB/SmolLM2-135M")
         predefined_tasks_raw = config.get("predefined_tasks", "[]")
         tasks_raw = config.get("tasks", "[]")
         limit = float(config.get("limit", 1.0))
@@ -131,8 +131,6 @@ def run_evaluation():
         # Load the model for evaluation
         try:
             from deepeval.models import DeepEvalBaseLLM
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            import torch
 
             # Check if using a local model or API-based model
             if generation_model.lower().startswith("gpt-") or "openai" in generation_model.lower():
@@ -148,6 +146,18 @@ def run_evaluation():
             else:
                 # Assume it's a local HuggingFace model
                 lab.log(f"Loading local model: {generation_model}")
+                
+                # Import PyTorch dependencies only when needed for local models
+                try:
+                    from transformers import AutoModelForCausalLM, AutoTokenizer
+                    import torch
+                except ImportError as import_err:
+                    error_msg = (
+                        "PyTorch and Transformers are required for local model inference. "
+                        "Please install them using: pip install torch transformers"
+                    )
+                    lab.log(f"Import error: {import_err}")
+                    raise ImportError(error_msg)
                 
                 # Create a custom DeepEval model wrapper
                 class LocalLLM(DeepEvalBaseLLM):

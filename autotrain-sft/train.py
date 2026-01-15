@@ -199,6 +199,10 @@ def train_model():
             if os.path.exists(project_name):
                 saved_path = lab.save_model(project_name, name=f"{project_name}_trained")
                 lab.log(f"✅ Model saved to lab: {saved_path}")
+                
+                # Save checkpoint
+                saved_checkpoint_path = lab.save_checkpoint(project_name, name=f"{project_name}_checkpoint")
+                lab.log(f"✅ Checkpoint saved to lab: {saved_checkpoint_path}")
             else:
                 lab.log("⚠️ Model directory not found")
         except Exception as e:
@@ -216,6 +220,7 @@ def train_model():
             "duration": training_duration,
             "model_name": project_name,
             "saved_model_path": saved_path if 'saved_path' in locals() else None,
+            "saved_checkpoint_path": saved_checkpoint_path if 'saved_checkpoint_path' in locals() else None,
         }
 
     except Exception as e:

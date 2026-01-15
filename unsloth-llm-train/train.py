@@ -138,7 +138,7 @@ def train_with_unsloth():
             "batch_size": 2,
             "gradient_accumulation_steps": 4,
             "warmup_steps": 5,
-            "max_steps": 100,
+            "max_steps": 10,
             "max_seq_length": 2048,
             "lora_r": 16,
             "lora_alpha": 16,
@@ -346,6 +346,7 @@ def train_with_unsloth():
                 logging_dir=f"{training_config['output_dir']}/logs",
                 remove_unused_columns=False,
                 push_to_hub=False,
+                report_to="wandb" if training_config["log_to_wandb"] else "none",
                 dataset_text_field="text",  # SFTTrainer will automatically tokenize this field
                 max_seq_length=training_config["_config"]["max_seq_length"],
                 packing=False,  # Don't pack sequences

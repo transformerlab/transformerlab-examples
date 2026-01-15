@@ -3,7 +3,7 @@
   "name": "grpo-multi-gpu-train-task",
   "command": "cd ~/grpo-multi-gpu-train && python train.py",
   "accelerators": "A100-80GB:1",
-  "setup": "uv pip install trl==0.15.2 bitsandbytes==0.45.4 accelerate==0.21.0 transformerlab datasets jinja2",
+  "setup": "uv pip install trl bitsandbytes accelerate transformerlab datasets jinja2",
   "env_vars": {
     "WANDB_PROJECT": "grpo-multi-gpu-training",
     "PYTHONUNBUFFERED": "1",

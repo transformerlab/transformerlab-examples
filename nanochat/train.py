@@ -159,7 +159,7 @@ def train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run):
     lab.log("🎯 Training base d12 model (test mode: reduced depth and steps)...")
     nproc_env = {"NPROC_PER_NODE": str(nproc)}
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train --depth=12 --max-steps=50 --run={wandb_run}",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train -- --depth=12 --max-steps=50 --run={wandb_run}",
         "Training base model",
         cwd=nanochat_dir,
         env=nproc_env
@@ -204,7 +204,7 @@ def train_midtraining(base_dir, nanochat_dir, nproc, wandb_run):
     # Run midtraining
     lab.log("🎯 Running midtraining...")
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.mid_train --run={wandb_run}",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.mid_train -- --run={wandb_run}",
         "Midtraining",
         cwd=nanochat_dir
     )
@@ -231,7 +231,7 @@ def train_sft(base_dir, nanochat_dir, nproc, wandb_run):
     # Run SFT
     lab.log("🎯 Running supervised finetuning...")
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_sft --run={wandb_run}",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_sft -- --run={wandb_run}",
         "Supervised finetuning",
         cwd=nanochat_dir
     )
@@ -274,7 +274,7 @@ def train_rl(base_dir, nanochat_dir, nproc, wandb_run, enable_rl=False):
     # Run RL
     lab.log("🎯 Running reinforcement learning on GSM8K...")
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_rl --run={wandb_run}",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_rl -- --run={wandb_run}",
         "Reinforcement learning",
         cwd=nanochat_dir
     )

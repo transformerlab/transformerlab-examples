@@ -156,10 +156,10 @@ def train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run):
     lab.log("✅ Dataset download complete")
         
     # Train base model (reduced for testing)
-    lab.log("🎯 Training base d12 model (test mode: reduced depth and steps)...")
+    lab.log("🎯 Training base d12 model (test mode: reduced depth and iterations)...")
     nproc_env = {"NPROC_PER_NODE": str(nproc)}
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train -- --depth=12 --max-steps=50 --run={wandb_run}",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train -- --depth=12 --num-iterations=50 --run={wandb_run}",
         "Training base model",
         cwd=nanochat_dir,
         env=nproc_env

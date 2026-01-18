@@ -470,8 +470,7 @@ def run_evaluation():
         lab.update_progress(60)
 
         # Create evaluation dataset and run evaluation
-        # Set conversational=False to ensure it's treated as single-turn dataset
-        dataset = EvaluationDataset(test_cases, conversational=False)
+        dataset = EvaluationDataset(test_cases)
 
         try:
             # Set the plugin to use sync mode if on macOS

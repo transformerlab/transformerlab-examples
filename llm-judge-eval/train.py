@@ -335,7 +335,7 @@ def run_evaluation():
                     LLMTestCaseParams.EXPECTED_OUTPUT,
                 ]
                 if met.get("include_context") == "Yes":
-                    evaluation_params.append(LLMTestCaseParams.RETRIEVAL_CONTEXT)
+                    evaluation_params.append(LLMTestCaseParams.CONTEXT)
 
                 evaluation_steps = None
 
@@ -427,7 +427,7 @@ def run_evaluation():
                                 input=row["input"],
                                 actual_output=row["output"],
                                 expected_output=row["expected_output"],
-                                retrieval_context=context,
+                                context=context,
                             )
                         )
                 else:

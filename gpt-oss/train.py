@@ -57,7 +57,7 @@ def train_gpt_oss():
         gradient_accumulation_steps = config.get("gradient_accumulation_steps", 1)
         warmup_ratio = config.get("warmup_ratio", 0.03)
         save_steps = config.get("save_steps", 500)
-        max_steps = config.get("max_steps", -1)
+        max_steps = config.get("max_steps", 5)
 
         # Check if we should resume from a checkpoint
         checkpoint = lab.get_checkpoint_to_resume()

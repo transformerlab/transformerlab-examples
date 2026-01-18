@@ -61,7 +61,7 @@ def run_evaluation():
         dataset_name = config.get("dataset", None)
         dataset_split = config.get("dataset_split", "train")
         generation_model = config.get("generation_model", "HuggingFaceTB/SmolLM2-135M")
-        predefined_tasks_raw = config.get("predefined_tasks", "[]")
+        predefined_tasks_raw = config.get("predefined_tasks", '[\"ToxicityMetric\"]')
         tasks_raw = config.get("tasks", "[]")
         limit = float(config.get("limit", 1.0))
         threshold = float(config.get("threshold", 0.5))

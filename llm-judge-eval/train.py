@@ -24,7 +24,7 @@ from deepeval import evaluate
 from deepeval.dataset import EvaluationDataset
 from deepeval.evaluate.configs import AsyncConfig
 from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCase, LLMTestCaseParams
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams, Golden
 
 from lab import lab
 
@@ -389,11 +389,11 @@ def run_evaluation():
                 all(elem in two_input_metrics for elem in formatted_predefined_tasks)
                 and len(three_input_custom_metric) == 0
             ):
-                # Two-input test cases
+                # Two-input test cases (single-turn)
                 lab.log("Creating two-input test cases")
                 for _, row in df.iterrows():
                     test_cases.append(
-                        LLMTestCase(
+                        Golden(
                             input=row["input"], 
                             actual_output=row["output"], 
                             expected_output=row["expected_output"]

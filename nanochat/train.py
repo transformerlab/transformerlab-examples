@@ -102,28 +102,6 @@ def train_tokenizer(base_dir, nanochat_dir):
     """Train the tokenizer"""
     lab.log("🔧 Phase: Tokenizer Training")
     
-    # Install Rust/Cargo
-    lab.log("🦀 Installing Rust/Cargo...")
-    cargo_home = os.path.expanduser("~/.cargo")
-    if not os.path.exists(cargo_home):
-        run_command(
-            "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
-            "Installing Rust",
-            stream_output=False
-        )
-    
-    # Source cargo env
-    cargo_bin = os.path.join(cargo_home, "bin")
-    if cargo_bin not in os.environ.get("PATH", ""):
-        os.environ["PATH"] = f"{cargo_bin}:{os.environ.get('PATH', '')}"
-    
-    # Build rustbpe tokenizer
-    lab.log("🔨 Building rustbpe tokenizer...")
-    run_command(
-        "uv run maturin develop --release --manifest-path rustbpe/Cargo.toml",
-        "Building tokenizer",
-        cwd=nanochat_dir
-    )    
     # Download initial dataset
     lab.log("📥 Downloading initial dataset shards (8)...")
     run_command(

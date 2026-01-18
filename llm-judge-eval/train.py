@@ -471,7 +471,8 @@ def run_evaluation():
 
         # Create evaluation dataset and run evaluation
         dataset = EvaluationDataset()
-        dataset.add_test_cases(test_cases)
+        for test_case in test_cases:
+            dataset.add_test_case(test_case)        
         try:
             # Set the plugin to use sync mode if on macOS
             # as MLX doesn't support async mode currently

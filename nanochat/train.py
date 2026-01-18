@@ -336,7 +336,7 @@ def main():
         
         # Extract parameters with defaults
         depth = config.get("depth", 20)
-        nproc_per_node = config.get("nproc_per_node", 8)
+        nproc_per_node = config.get("nproc_per_node", 1)
         enable_rl = config.get("enable_rl", False)
         log_to_wandb = config.get("log_to_wandb", False)
         
@@ -349,7 +349,7 @@ def main():
         traceback.print_exc()
         config = {}
         depth = 20
-        nproc_per_node = 8
+        nproc_per_node = 1
         enable_rl = False
         log_to_wandb = False
     

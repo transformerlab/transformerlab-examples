@@ -102,18 +102,18 @@ def train_tokenizer(base_dir, nanochat_dir):
     """Train the tokenizer"""
     lab.log("🔧 Phase: Tokenizer Training")
     
-    # Download initial dataset
-    lab.log("📥 Downloading initial dataset shards (8)...")
+    # Download initial dataset (reduced for testing)
+    lab.log("📥 Downloading initial dataset shards (2 - test mode)...")
     run_command(
-        "uv run python -m nanochat.dataset -n 8",
+        "uv run python -m nanochat.dataset -n 2",
         "Downloading dataset shards",
         cwd=nanochat_dir
     )
     
-    # Start downloading additional shards in background
-    lab.log("📥 Starting background download of additional shards (240)...")
+    # Start downloading additional shards in background (reduced for testing)
+    lab.log("📥 Starting background download of additional shards (10 - test mode)...")
     dataset_process = subprocess.Popen(
-        "uv run python -m nanochat.dataset -n 240",
+        "uv run python -m nanochat.dataset -n 10",
         shell=True,
         cwd=nanochat_dir,
         stdout=subprocess.DEVNULL,
@@ -121,10 +121,10 @@ def train_tokenizer(base_dir, nanochat_dir):
     )
     
     
-    # Train tokenizer
-    lab.log("🎯 Training tokenizer...")
+    # Train tokenizer (reduced data for testing)
+    lab.log("🎯 Training tokenizer (test mode: 5M chars)...")
     run_command(
-        "uv run python -m scripts.tok_train --max_chars=2000000000",
+        "uv run python -m scripts.tok_train --max-chars=5000000",
         "Training tokenizer",
         cwd=nanochat_dir
     )
@@ -155,20 +155,20 @@ def train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run):
     dataset_process.wait()
     lab.log("✅ Dataset download complete")
         
-    # Train base model
-    lab.log("🎯 Training base d20 model (this will take a while)...")
+    # Train base model (reduced for testing)
+    lab.log("🎯 Training base d12 model (test mode: reduced depth and steps)...")
     nproc_env = {"NPROC_PER_NODE": str(nproc)}
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train --depth=20 --run={wandb_run}",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train --depth=12 --max-steps=50 --run={wandb_run}",
         "Training base model",
         cwd=nanochat_dir,
         env=nproc_env
     )
         
     # Save base model checkpoint
-    model_path = os.path.join(base_dir, "checkpoints", "model_d20.pt")
+    model_path = os.path.join(base_dir, "checkpoints", "model_d12_test.pt")
     if os.path.exists(model_path):
-        lab.save_checkpoint(model_path, "base_model_d20.pt")
+        lab.save_checkpoint(model_path, "base_model_d12_test.pt")
         lab.log("✅ Base model checkpoint saved")
     
     # Evaluate on train/val

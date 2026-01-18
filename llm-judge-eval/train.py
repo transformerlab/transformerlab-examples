@@ -487,7 +487,7 @@ def run_evaluation():
             
             # Run the evaluation
             async_config = AsyncConfig(run_async=async_mode)
-            output = evaluate(dataset, metrics_arr, async_config=async_config)
+            output = evaluate(dataset.test_cases, metrics_arr, async_config=async_config)
             
             lab.update_progress(85)
 

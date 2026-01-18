@@ -24,7 +24,7 @@ from deepeval import evaluate
 from deepeval.dataset import EvaluationDataset
 from deepeval.evaluate.configs import AsyncConfig
 from deepeval.metrics import GEval
-from deepeval.test_case import LLMTestCase, LLMTestCaseParams, Golden
+from deepeval.test_case import LLMTestCase, LLMTestCaseParams
 
 from lab import lab
 
@@ -393,7 +393,7 @@ def run_evaluation():
                 lab.log("Creating two-input test cases")
                 for _, row in df.iterrows():
                     test_cases.append(
-                        Golden(
+                        LLMTestCase(
                             input=row["input"], 
                             actual_output=row["output"], 
                             expected_output=row["expected_output"]
@@ -470,7 +470,8 @@ def run_evaluation():
         lab.update_progress(60)
 
         # Create evaluation dataset and run evaluation
-        dataset = EvaluationDataset(test_cases)
+        # Set conversational=False to ensure it's treated as single-turn dataset
+        dataset = EvaluationDataset(test_cases, conversational=False)
 
         try:
             # Set the plugin to use sync mode if on macOS

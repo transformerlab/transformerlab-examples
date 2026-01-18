@@ -427,7 +427,7 @@ def run_evaluation():
                                 input=row["input"],
                                 actual_output=row["output"],
                                 expected_output=row["expected_output"],
-                                context=context,
+                                retrieval_context=context,
                             )
                         )
                 else:
@@ -451,7 +451,7 @@ def run_evaluation():
                                 input=row["input"],
                                 actual_output=row["output"],
                                 expected_output=row["expected_output"],
-                                context=context,  # Uses 'context' instead of 'retrieval_context'
+                                retrieval_context=context,
                             )
                         )
         except Exception as e:

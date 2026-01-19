@@ -33,7 +33,7 @@ class Net(nn.Module):
         return F.log_softmax(x, dim=1)
 
 # Training function
-def train(model, device, train_loader, optimizer, epoch, log_interval, total_epochs=None, visualize=False, visualize_interval=None, output_dir=None):
+def train(model, device, train_loader, optimizer, epoch, log_interval, total_epochs=None, visualize=True, output_dir=None):
     model.train()
     total_batches = len(train_loader)
     for batch_idx, (data, target) in enumerate(train_loader):
@@ -44,11 +44,12 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
         loss.backward()
         optimizer.step()
 
-        # Optionally save prediction images every visualize_interval steps
-        if visualize and visualize_interval and output_dir is not None:
+        # Save prediction images at each training step if visualization enabled
+        if visualize and output_dir is not None:
             # global step index across epochs (0-based)
             global_step = (epoch - 1) * total_batches + batch_idx
-            if global_step % int(visualize_interval) == 0:
+            # Save every 10 global steps
+            if global_step % 10 == 0:
                 try:
                     # prepare a small batch of images/preds (convert to cpu numpy)
                     imgs = data.cpu().numpy()
@@ -177,15 +178,6 @@ def main():
         output_dir = config.get("output_dir", "./mnist_model")
         # Wandb flag from config (default False)
         log_to_wandb = bool(config.get("log_to_wandb", False))
-        # Visualization interval (save every X global steps). If None or 0 => disabled
-        visualize_interval = config.get("visualize_interval", None)
-        if visualize_interval is not None:
-            try:
-                visualize_interval = int(visualize_interval)
-                if visualize_interval <= 0:
-                    visualize_interval = None
-            except Exception:
-                visualize_interval = None
 
         # Log configuration details
         lab.log("🚀 Starting MNIST training task...")
@@ -240,19 +232,12 @@ def main():
         lab.log("🔍 Evaluating model before training...")
         # call test to save "before" snapshot
         test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="before")
-        # Also create initial step_0 from an untrained batch if interval requested
-        if visualize_interval is not None:
-            try:
-                train(model, device, train_loader, optimizer, epoch=1, log_interval=log_interval, total_epochs=epochs, visualize=True, visualize_interval=visualize_interval, output_dir=output_dir)
-            except Exception:
-                # ignore; training loop will run normally below
-                pass
 
         # Training loop
         for epoch in range(1, epochs + 1):
             lab.log(f"🚀 Starting epoch {epoch}/{epochs}...")
-            # pass visualization params into train
-            train(model, device, train_loader, optimizer, epoch, log_interval, total_epochs=epochs, visualize=(visualize_interval is not None), visualize_interval=visualize_interval, output_dir=output_dir)
+            # always save predictions at every training step
+            train(model, device, train_loader, optimizer, epoch, log_interval, total_epochs=epochs, visualize=True, output_dir=output_dir)
             test(model, device, test_loader, output_dir=output_dir)
 
         # Save the model

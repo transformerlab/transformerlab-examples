@@ -255,13 +255,6 @@ def main():
             train(model, device, train_loader, optimizer, epoch, log_interval, total_epochs=epochs, visualize=(visualize_interval is not None), visualize_interval=visualize_interval, output_dir=output_dir)
             test(model, device, test_loader, output_dir=output_dir)
 
-        # After training save final visualization
-        try:
-            # create a final predictions image using test set
-            test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="final")
-        except Exception:
-            pass
-
         # Save the model
         model_path = os.path.join(output_dir, f"{model_name}.pt")
         torch.save(model.state_dict(), model_path)

@@ -204,8 +204,6 @@ def train_model():
             lab.finish("Training failed due to dataset loading error.")
             return {"status": "error", "error": str(e)}
 
-        lab.update_progress(20)
-
         lab.log("Preparing dataset...")
         try:
             # Getting the speaker id is important for multi-speaker models and speaker consistency
@@ -235,8 +233,6 @@ def train_model():
             lab.log(f"❌ Failed to prepare dataset: {e}")
             lab.finish("Training failed due to dataset preparation error.")
             return {"status": "error", "error": str(e)}
-
-        lab.update_progress(30)
 
         # Load model and tokenizer using
         lab.log("Loading model and tokenizer and trainer...")
@@ -306,8 +302,6 @@ def train_model():
             lab.finish("Training failed due to model loading error.")
             return {"status": "error", "error": str(e)}
 
-        lab.update_progress(40)
-
         lab.log("Preprocessing dataset...")
 
         try:
@@ -325,8 +319,6 @@ def train_model():
             lab.log(f"❌ Failed to preprocess dataset: {e}")
             lab.finish("Training failed due to dataset preprocessing error.")
             return {"status": "error", "error": str(e)}
-
-        lab.update_progress(50)
 
         lab.log("Setting up trainer...")
         try:
@@ -375,8 +367,6 @@ def train_model():
             traceback.print_exc()
             lab.finish("Training failed due to trainer setup error.")
             return {"status": "error", "error": str(e)}
-
-        lab.update_progress(60)
 
         # Train the model
         lab.log("Starting training...")
@@ -430,7 +420,6 @@ def train_model():
             lab.finish("Training failed")
             return {"status": "error", "error": str(e)}
 
-        lab.update_progress(90)  # Calculate training time
         end_time = datetime.now()
         training_duration = end_time - start_time
         lab.log(f"Training completed in {training_duration}")
@@ -483,11 +472,6 @@ def train_model():
         saved_path = lab.save_model(model_dir, name="unsloth_trained_model")
         lab.log(f"✅ Model saved to job models directory: {saved_path}")
 
-        # Get the captured wandb URL from job data for reporting
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Final wandb URL stored in job data: {captured_wandb_url}")
-
         # Finish wandb run if it was initialized
         try:
             import wandb
@@ -509,7 +493,6 @@ def train_model():
             "duration": str(training_duration),
             "output_dir": training_config["output_dir"],
             "saved_model_path": saved_path,
-            "wandb_url": captured_wandb_url,
             "trainer_type": "Unsloth TTS Trainer",
             "gpu_used": os.environ.get("CUDA_VISIBLE_DEVICES", "all"),
         }

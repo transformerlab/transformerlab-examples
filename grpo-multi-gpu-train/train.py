@@ -156,11 +156,11 @@ def train_model():
     # Training configuration
     training_config = {
         "experiment_name": "grpo-multi-gpu-training",
-        "model_name": "meta-llama/Llama-3.2-1B",  # Example model
+        "model_name": "unsloth/SmolLM2-135M",  # Example model
         "dataset": "openai/gsm8k",  # Example dataset for reasoning
         "template_name": "grpo-multi-gpu-demo",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             "dataset_name": "openai/gsm8k",
             "dataset_config": "main",
@@ -182,7 +182,7 @@ def train_model():
             "adam_beta1": 0.9,
             "adam_beta2": 0.999,
             "adam_epsilon": 1e-08,
-            "max_steps": -1,  # -1 means use num_train_epochs
+            "max_steps": 5,  # -1 means use num_train_epochs
             "train_device": "cuda",
             "gpu_ids": "auto",  # auto means use all available GPUs
             # Template configuration
@@ -342,6 +342,11 @@ def train_model():
 
             tokenizer = AutoTokenizer.from_pretrained(model_id)
             tokenizer.padding_side = "right"
+            
+            # Set chat template for SmolLM2 if not present
+            if tokenizer.chat_template is None:
+                tokenizer.chat_template = "{% for message in messages %}{{ message['role'] }}: {{ message['content'] }}\n{% endfor %}assistant: "
+            
             model = AutoModelForCausalLM.from_pretrained(
                 model_id,
                 torch_dtype=torch.bfloat16,
@@ -389,7 +394,7 @@ def train_model():
             adam_epsilon=adam_epsilon,
             disable_tqdm=False,
             run_name=f"grpo_{run_suffix}",
-            report_to="wandb" if training_config.get("log_to_wandb", True) else "none",
+            report_to="wandb" if training_config.get("log_to_wandb", False) else "none",
             ddp_find_unused_parameters=False,
             dataloader_pin_memory=True,
             no_cuda=False,
@@ -509,11 +514,6 @@ def train_model():
         saved_path = lab.save_model(model_dir, name="grpo_multi_gpu_trained_model")
         lab.log(f"✅ Model saved to job models directory: {saved_path}")
 
-        # Get the captured wandb URL from job data for reporting
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Final wandb URL stored in job data: {captured_wandb_url}")
-
         # Finish wandb run if it was initialized
         try:
             import wandb
@@ -535,7 +535,6 @@ def train_model():
             "duration": str(training_duration),
             "output_dir": output_dir,
             "saved_model_path": saved_path,
-            "wandb_url": captured_wandb_url,
             "trainer_type": "Multi-GPU GRPO",
             "num_gpus": accelerator.num_processes,
             "device": str(accelerator.device),

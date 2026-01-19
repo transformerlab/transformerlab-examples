@@ -199,6 +199,10 @@ def train_model():
             if os.path.exists(project_name):
                 saved_path = lab.save_model(project_name, name=f"{project_name}_trained")
                 lab.log(f"✅ Model saved to lab: {saved_path}")
+                
+                # Save checkpoint
+                saved_checkpoint_path = lab.save_checkpoint(project_name, name=f"{project_name}_checkpoint")
+                lab.log(f"✅ Checkpoint saved to lab: {saved_checkpoint_path}")
             else:
                 lab.log("⚠️ Model directory not found")
         except Exception as e:
@@ -208,6 +212,32 @@ def train_model():
         training_duration = end_time - start_time
         lab.log(f"Training completed in {training_duration:.2f} seconds")
 
+        # Save training summary as artifact
+        summary_file = os.path.join(plugin_dir, "training_summary.txt")
+        with open(summary_file, "w") as f:
+            f.write("AutoTrain SFT Training Summary\n")
+            f.write("=" * 40 + "\n")
+            f.write(f"Model: {training_config['model_name']}\n")
+            f.write(f"Dataset: {training_config['dataset']}\n")
+            f.write(f"Project Name: {project_name}\n")
+            f.write(f"Training Duration: {training_duration:.2f} seconds\n")
+            f.write(f"Learning Rate: {config['learning_rate']}\n")
+            f.write(f"Batch Size: {config.get('batch_size', 4)}\n")
+            f.write(f"Number of Epochs: {config.get('num_train_epochs', 1)}\n")
+            f.write(f"Max Steps: {config.get('max_steps', 'Not set')}\n")
+            f.write(f"Completed at: {time.ctime(end_time)}\n")
+
+        summary_artifact_path = lab.save_artifact(summary_file, "training_summary.txt")
+        lab.log(f"Saved training summary: {summary_artifact_path}")
+
+        # Save training configuration as artifact
+        config_file = os.path.join(plugin_dir, "training_config.json")
+        with open(config_file, "w") as f:
+            json.dump(training_config, f, indent=2)
+
+        config_artifact_path = lab.save_artifact(config_file, "training_config.json")
+        lab.log(f"Saved training config: {config_artifact_path}")
+
         lab.update_progress(100)
         lab.finish("Training completed successfully")
 
@@ -216,6 +246,7 @@ def train_model():
             "duration": training_duration,
             "model_name": project_name,
             "saved_model_path": saved_path if 'saved_path' in locals() else None,
+            "saved_checkpoint_path": saved_checkpoint_path if 'saved_checkpoint_path' in locals() else None,
         }
 
     except Exception as e:

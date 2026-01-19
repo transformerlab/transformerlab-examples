@@ -58,10 +58,10 @@ def run_evaluation():
         config = lab.get_config()
 
         # Extract parameters with defaults
-        dataset_name = config.get("dataset", "")
+        dataset_name = config.get("dataset", None)
         dataset_split = config.get("dataset_split", "train")
-        generation_model = config.get("generation_model", "gpt-4o-mini")
-        predefined_tasks_raw = config.get("predefined_tasks", "[]")
+        generation_model = config.get("generation_model", "HuggingFaceTB/SmolLM2-135M")
+        predefined_tasks_raw = config.get("predefined_tasks", '[\"Toxicity\"]')
         tasks_raw = config.get("tasks", "[]")
         limit = float(config.get("limit", 1.0))
         threshold = float(config.get("threshold", 0.5))
@@ -131,8 +131,6 @@ def run_evaluation():
         # Load the model for evaluation
         try:
             from deepeval.models import DeepEvalBaseLLM
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            import torch
 
             # Check if using a local model or API-based model
             if generation_model.lower().startswith("gpt-") or "openai" in generation_model.lower():
@@ -149,15 +147,50 @@ def run_evaluation():
                 # Assume it's a local HuggingFace model
                 lab.log(f"Loading local model: {generation_model}")
                 
+                # Import PyTorch dependencies only when needed for local models
+                try:
+                    from transformers import AutoModelForCausalLM, AutoTokenizer
+                    import torch
+                except ImportError as import_err:
+                    error_msg = (
+                        "PyTorch and Transformers are required for local model inference. "
+                        "Please install them using: pip install torch transformers"
+                    )
+                    lab.log(f"Import error: {import_err}")
+                    raise ImportError(error_msg)
+                
+                # Check if accelerate is available for device_map support
+                try:
+                    import accelerate
+                    has_accelerate = True
+                except ImportError:
+                    has_accelerate = False
+                    lab.log("Note: accelerate not installed, using default device placement")
+                
                 # Create a custom DeepEval model wrapper
                 class LocalLLM(DeepEvalBaseLLM):
                     def __init__(self, model_name):
                         self.model_name = model_name
+                        
+                        # Prepare model loading arguments
+                        model_kwargs = {
+                            "dtype": torch.float16 if torch.cuda.is_available() else torch.float32,
+                        }
+                        
+                        # Only use device_map if accelerate is available
+                        if has_accelerate:
+                            model_kwargs["device_map"] = "auto"
+                        
                         self.model = AutoModelForCausalLM.from_pretrained(
                             model_name,
-                            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                            device_map="auto"
+                            **model_kwargs
                         )
+                        
+                        # Move model to device if accelerate is not available
+                        if not has_accelerate:
+                            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                            self.model = self.model.to(device)
+                        
                         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
                         if self.tokenizer.pad_token is None:
                             self.tokenizer.pad_token = self.tokenizer.eos_token
@@ -207,14 +240,33 @@ def run_evaluation():
                 df = dataset_dict[dataset_split].to_pandas()
                 lab.log(f"Dataset loaded successfully: {len(df)} examples")
             else:
-                lab.log("No dataset specified, using a sample dataset")
-                # Create a sample dataset for testing
-                df = pd.DataFrame({
-                    "input": ["What is the capital of France?", "Explain quantum computing"],
-                    "output": ["Paris is the capital of France.", "Quantum computing uses quantum mechanics."],
-                    "expected_output": ["Paris", "Quantum computing is a type of computing that uses quantum-mechanical phenomena."]
-                })
-                lab.log(f"Using sample dataset: {len(df)} examples")
+                lab.log("⚠️ No dataset specified. Creating sample dataset with 5 examples...")
+                # Create a sample dataset with 5 datapoints
+                sample_data = {
+                    "input": [
+                        "What is the capital of France?",
+                        "Explain quantum computing",
+                        "What is the largest planet in our solar system?",
+                        "Define machine learning in simple terms",
+                        "What is the chemical symbol for gold?"
+                    ],
+                    "output": [
+                        "Paris is the capital of France.",
+                        "Quantum computing uses quantum mechanics principles to process information.",
+                        "Jupiter is the largest planet in our solar system.",
+                        "Machine learning is a type of artificial intelligence that learns from data.",
+                        "The chemical symbol for gold is Au."
+                    ],
+                    "expected_output": [
+                        "Paris",
+                        "Quantum computing leverages quantum mechanical phenomena like superposition and entanglement.",
+                        "Jupiter",
+                        "Machine learning enables computers to learn from examples without explicit programming.",
+                        "Au"
+                    ]
+                }
+                df = pd.DataFrame(sample_data)
+                lab.log(f"✅ Created sample dataset with {len(df)} examples")
         except Exception as e:
             lab.log(f"Error loading dataset: {e}")
             traceback.print_exc()
@@ -283,7 +335,7 @@ def run_evaluation():
                     LLMTestCaseParams.EXPECTED_OUTPUT,
                 ]
                 if met.get("include_context") == "Yes":
-                    evaluation_params.append(LLMTestCaseParams.RETRIEVAL_CONTEXT)
+                    evaluation_params.append(LLMTestCaseParams.CONTEXT)
 
                 evaluation_steps = None
 
@@ -337,7 +389,7 @@ def run_evaluation():
                 all(elem in two_input_metrics for elem in formatted_predefined_tasks)
                 and len(three_input_custom_metric) == 0
             ):
-                # Two-input test cases
+                # Two-input test cases (single-turn)
                 lab.log("Creating two-input test cases")
                 for _, row in df.iterrows():
                     test_cases.append(
@@ -399,7 +451,7 @@ def run_evaluation():
                                 input=row["input"],
                                 actual_output=row["output"],
                                 expected_output=row["expected_output"],
-                                context=context,  # Uses 'context' instead of 'retrieval_context'
+                                retrieval_context=context,
                             )
                         )
         except Exception as e:
@@ -418,8 +470,9 @@ def run_evaluation():
         lab.update_progress(60)
 
         # Create evaluation dataset and run evaluation
-        dataset = EvaluationDataset(test_cases)
-
+        dataset = EvaluationDataset()
+        for test_case in test_cases:
+            dataset.add_test_case(test_case)        
         try:
             # Set the plugin to use sync mode if on macOS
             # as MLX doesn't support async mode currently
@@ -434,7 +487,7 @@ def run_evaluation():
             
             # Run the evaluation
             async_config = AsyncConfig(run_async=async_mode)
-            output = evaluate(dataset, metrics_arr, async_config=async_config)
+            output = evaluate(dataset.test_cases, metrics_arr, async_config=async_config)
             
             lab.update_progress(85)
 

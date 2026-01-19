@@ -206,6 +206,8 @@ def run_objective_evaluation():
         threshold = float(config.get("threshold", 0.5))
         limit = float(config.get("limit", 1.0))
         dataset_split = config.get("dataset_split", "train")
+        output = config.get("output", "./output")
+        os.makedirs(output, exist_ok=True)
 
         # Parse tasks parameter
         if isinstance(tasks_param, str):
@@ -249,22 +251,47 @@ def run_objective_evaluation():
             # Get dataset path from config
             dataset_path = config.get("dataset")
             if not dataset_path:
-                error_msg = "No dataset specified in configuration"
-                lab.log(f"❌ {error_msg}")
-                lab.error(error_msg)
-                return {"status": "error", "error": error_msg}
+                lab.log("⚠️ No dataset specified. Creating sample dataset with 5 examples...")
+                
+                # Create sample dataset with 5 examples
+                sample_data = {
+                    "input": [
+                        "What is the capital of France?",
+                        "How many sides does a triangle have?",
+                        "What is 2 + 2?",
+                        "What is the largest planet in our solar system?",
+                        "What is the chemical symbol for gold?"
+                    ],
+                    "output": [
+                        "Paris is the capital of France.",
+                        "A triangle has three sides.",
+                        "2 + 2 equals 4.",
+                        "Jupiter is the largest planet in our solar system.",
+                        "The chemical symbol for gold is Au."
+                    ],
+                    "expected_output": [
+                        "Paris",
+                        "3",
+                        "4",
+                        "Jupiter",
+                        "Au"
+                    ]
+                }
+                
+                df = pd.DataFrame(sample_data)
+                lab.log(f"✅ Created sample dataset with {len(df)} examples")
+            else:
+                # Load dataset from specified path
+                dataset = load_dataset(dataset_path)
+                
+                if dataset_split not in dataset:
+                    error_msg = f"Dataset split '{dataset_split}' not found. Available splits: {list(dataset.keys())}"
+                    lab.log(f"❌ {error_msg}")
+                    lab.error(error_msg)
+                    return {"status": "error", "error": error_msg}
 
-            # Load dataset
-            dataset = load_dataset(dataset_path)
-            
-            if dataset_split not in dataset:
-                error_msg = f"Dataset split '{dataset_split}' not found. Available splits: {list(dataset.keys())}"
-                lab.log(f"❌ {error_msg}")
-                lab.error(error_msg)
-                return {"status": "error", "error": error_msg}
-
-            df = dataset[dataset_split].to_pandas()
-            lab.log(f"✅ Loaded dataset with {len(df)} rows for split '{dataset_split}'")
+                df = dataset[dataset_split].to_pandas()
+                lab.log(f"✅ Loaded dataset with {len(df)} rows for split '{dataset_split}'")
 
         except Exception as e:
             error_msg = f"Error loading dataset: {e}"
@@ -417,9 +444,14 @@ def run_objective_evaluation():
                 }
 
         # Save summary as artifact
+        summary_file_path = os.path.join(output, "evaluation_summary.json")
+        with open(summary_file_path, "w") as f:
+            json.dump(summary["metrics"], f, indent=2)
+        
         summary_path = lab.save_artifact(
-            pd.DataFrame([summary["metrics"]]),
-            name="evaluation_summary.csv",
+            summary_file_path,
+            name="evaluation_summary.json",
+            type="json",
         )
         lab.log(f"✅ Saved evaluation summary: {summary_path}")
 

@@ -130,7 +130,7 @@ def train_with_unsloth():
         "dataset": "Trelis/touch-rugby-rules",  # Example dataset
         "template_name": "unsloth-demo",
         "output_dir": "./output",
-        "log_to_wandb": True,
+        "log_to_wandb": False,
         "_config": {
             "dataset_name": "Trelis/touch-rugby-rules",
             "lr": 2e-4,
@@ -138,7 +138,7 @@ def train_with_unsloth():
             "batch_size": 2,
             "gradient_accumulation_steps": 4,
             "warmup_steps": 5,
-            "max_steps": 100,
+            "max_steps": 10,
             "max_seq_length": 2048,
             "lora_r": 16,
             "lora_alpha": 16,
@@ -346,6 +346,7 @@ def train_with_unsloth():
                 logging_dir=f"{training_config['output_dir']}/logs",
                 remove_unused_columns=False,
                 push_to_hub=False,
+                report_to="wandb" if training_config["log_to_wandb"] else "none",
                 dataset_text_field="text",  # SFTTrainer will automatically tokenize this field
                 max_seq_length=training_config["_config"]["max_seq_length"],
                 packing=False,  # Don't pack sequences
@@ -476,11 +477,6 @@ def train_with_unsloth():
         saved_path = lab.save_model(model_dir, name="unsloth_trained_model")
         lab.log(f"✅ Model saved to job models directory: {saved_path}")
 
-        # Get the captured wandb URL from job data for reporting
-        job_data = lab.job.get_job_data()
-        captured_wandb_url = job_data.get("wandb_run_url", "None")
-        lab.log(f"📋 Final wandb URL stored in job data: {captured_wandb_url}")
-
         # Finish wandb run if it was initialized
         try:
             import wandb
@@ -502,7 +498,6 @@ def train_with_unsloth():
             "duration": str(training_duration),
             "output_dir": training_config["output_dir"],
             "saved_model_path": saved_path,
-            "wandb_url": captured_wandb_url,
             "trainer_type": "Unsloth FastLanguageModel",
             "gpu_used": os.environ.get("CUDA_VISIBLE_DEVICES", "all"),
         }

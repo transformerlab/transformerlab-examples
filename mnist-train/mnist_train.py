@@ -11,9 +11,6 @@ try:
 except Exception:
     wandb = None
 
-# Add a module-level flag that will be set in main()
-use_wandb = False
-
 # New: how often to save prediction visualizations (in global steps). Default 200.
 prediction_save_every_steps = 200
 
@@ -76,7 +73,7 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
             lab.log(f"📊 Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
             lab.update_progress(percent)
             # Log to wandb if enabled
-            if use_wandb and wandb is not None:
+            if wandb is not None:
                 try:
                     wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx, "train/progress": percent})
                 except Exception as e:
@@ -106,7 +103,7 @@ def test(model, device, test_loader, visualize=False, output_dir=None, stage=Non
     lab.log(f"✅ Test set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({accuracy:.2f}%)")
 
     # Log to wandb if enabled
-    if use_wandb and wandb is not None:
+    if wandb is not None:
         try:
             wandb.log({"test/loss": test_loss, "test/accuracy": accuracy})
         except Exception as e:
@@ -181,7 +178,7 @@ def main():
         log_interval = config.get("log_interval", 10)
         output_dir = config.get("output_dir", "./mnist_model")
         # Wandb flag from config (default False)
-        log_to_wandb = bool(config.get("log_to_wandb", False))
+        log_to_wandb = bool(config.get("log_to_wandb", True))
 
         # Set prediction save frequency from config (can set 200 or 100)
         global prediction_save_every_steps
@@ -202,16 +199,12 @@ def main():
         lab.log(f"📡 Wandb tracking: {'enabled' if log_to_wandb else 'disabled'}")
 
         # Initialize wandb if requested and available
-        global use_wandb
-        use_wandb = False
         if log_to_wandb and wandb is not None:
             try:
                 wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"), config=config, name=f"{model_name}-{lab.job.id}" if hasattr(lab, "job") else model_name)
                 lab.log("✅ Wandb initialized")
-                use_wandb = True
             except Exception as e:
                 lab.log(f"⚠️ Wandb init failed: {e}")
-                use_wandb = False
 
         # Set random seed for reproducibility
         torch.manual_seed(seed)
@@ -263,7 +256,7 @@ def main():
         test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="after")
 
         # Finish wandb if used
-        if use_wandb and wandb is not None:
+        if wandb is not None:
             try:
                 wandb.finish()
             except Exception:

@@ -8,6 +8,9 @@ from lab import lab
 import matplotlib.pyplot as plt
 import wandb
 
+# Track whether wandb successfully initialized (or anonymous allowed)
+wandb_enabled = False
+
 # New: how often to save prediction visualizations (in global steps). Default 200.
 prediction_save_every_steps = 200
 
@@ -69,20 +72,9 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
             percent = max(0, min(percent, 100))
             lab.log(f"📊 Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
             lab.update_progress(percent)
-            # Ensure wandb is initialized (init here as well) and log if available
+            # Log to wandb if available (do not init per-batch). Prefer main() to init.
             try:
-                if getattr(wandb, "run", None) is None:
-                    try:
-                        try:
-                            wandb.login()
-                            lab.log("🔐 Wandb login succeeded in train()")
-                        except Exception as le:
-                            lab.log(f"⚠️ Wandb login in train failed: {le}")
-                        wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"))
-                        lab.log("✅ Wandb initialized in train()")
-                    except Exception as ie:
-                        lab.log(f"⚠️ Wandb init in train failed: {ie}")
-                if getattr(wandb, "run", None) is not None:
+                if wandb_enabled or getattr(wandb, "run", None) is not None:
                     wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx, "train/progress": percent})
             except Exception as e:
                 lab.log(f"⚠️ Wandb log failed during train: {e}")
@@ -110,7 +102,8 @@ def test(model, device, test_loader, visualize=False, output_dir=None, stage=Non
     accuracy = 100. * correct / len(test_loader.dataset)
     lab.log(f"✅ Test set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({accuracy:.2f}%)")
     try:
-        wandb.log({"test/loss": test_loss, "test/accuracy": accuracy})
+        if wandb_enabled or getattr(wandb, "run", None) is not None:
+            wandb.log({"test/loss": test_loss, "test/accuracy": accuracy})
     except Exception as e:
         lab.log(f"⚠️ Wandb log failed during test: {e}")
 
@@ -206,16 +199,19 @@ def main():
         # Initialize wandb if requested and available
         if log_to_wandb:
             try:
-                # try to login first (allows interactive/API-key setups)
+                # try to login first (allows interactive/API-key setups). Allow anonymous if no key.
                 try:
-                    wandb.login()
-                    lab.log("🔐 Wandb login succeeded")
+                    wandb.login(anonymous="allow")
+                    lab.log("🔐 Wandb login succeeded (possibly anonymous)")
                 except Exception as le:
                     lab.log(f"⚠️ Wandb login failed: {le}")
-                wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"), config=config, name=f"{model_name}-{lab.job.id}" if hasattr(lab, "job") else model_name)
+                wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"), config=config, name=f"{model_name}-{lab.job.id}" if hasattr(lab, "job") else model_name, anonymous="allow")
                 lab.log("✅ Wandb initialized")
+                global wandb_enabled
+                wandb_enabled = getattr(wandb, "run", None) is not None
             except Exception as e:
                 lab.log(f"⚠️ Wandb init failed: {e}")
+                wandb_enabled = False
 
         # Set random seed for reproducibility
         torch.manual_seed(seed)
@@ -267,7 +263,7 @@ def main():
         test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="after")
 
         # Finish wandb if used
-        if log_to_wandb:
+        if log_to_wandb and (wandb_enabled or getattr(wandb, "run", None) is not None):
             try:
                 wandb.finish()
             except Exception:

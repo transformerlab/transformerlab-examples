@@ -201,7 +201,7 @@ def main():
             try:
                 # try to login first (allows interactive/API-key setups). Allow anonymous if no key.
                 try:
-                    wandb.login(anonymous="allow")
+                    wandb.login(anonymous="allow", key=os.environ.get("WANDB_API_KEY", None))
                     lab.log("🔐 Wandb login succeeded (possibly anonymous)")
                 except Exception as le:
                     lab.log(f"⚠️ Wandb login failed: {le}")

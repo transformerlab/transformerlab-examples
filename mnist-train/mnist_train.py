@@ -73,6 +73,11 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
             try:
                 if getattr(wandb, "run", None) is None:
                     try:
+                        try:
+                            wandb.login()
+                            lab.log("🔐 Wandb login succeeded in train()")
+                        except Exception as le:
+                            lab.log(f"⚠️ Wandb login in train failed: {le}")
                         wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"))
                         lab.log("✅ Wandb initialized in train()")
                     except Exception as ie:
@@ -201,6 +206,12 @@ def main():
         # Initialize wandb if requested and available
         if log_to_wandb:
             try:
+                # try to login first (allows interactive/API-key setups)
+                try:
+                    wandb.login()
+                    lab.log("🔐 Wandb login succeeded")
+                except Exception as le:
+                    lab.log(f"⚠️ Wandb login failed: {le}")
                 wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"), config=config, name=f"{model_name}-{lab.job.id}" if hasattr(lab, "job") else model_name)
                 lab.log("✅ Wandb initialized")
             except Exception as e:

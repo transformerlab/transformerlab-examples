@@ -6,10 +6,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from lab import lab
 import matplotlib.pyplot as plt
-try:
-    import wandb
-except Exception:
-    wandb = None
+import wandb
 
 # New: how often to save prediction visualizations (in global steps). Default 200.
 prediction_save_every_steps = 200
@@ -73,11 +70,10 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
             lab.log(f"📊 Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
             lab.update_progress(percent)
             # Log to wandb if enabled
-            if wandb is not None:
-                try:
-                    wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx, "train/progress": percent})
-                except Exception as e:
-                    lab.log(f"⚠️ Wandb log failed during train: {e}")
+            try:
+                wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx, "train/progress": percent})
+            except Exception as e:
+                lab.log(f"⚠️ Wandb log failed during train: {e}")
 
 # Test function
 def test(model, device, test_loader, visualize=False, output_dir=None, stage=None):
@@ -101,13 +97,10 @@ def test(model, device, test_loader, visualize=False, output_dir=None, stage=Non
     test_loss /= len(test_loader.dataset)
     accuracy = 100. * correct / len(test_loader.dataset)
     lab.log(f"✅ Test set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)} ({accuracy:.2f}%)")
-
-    # Log to wandb if enabled
-    if wandb is not None:
-        try:
-            wandb.log({"test/loss": test_loss, "test/accuracy": accuracy})
-        except Exception as e:
-            lab.log(f"⚠️ Wandb log failed during test: {e}")
+    try:
+        wandb.log({"test/loss": test_loss, "test/accuracy": accuracy})
+    except Exception as e:
+        lab.log(f"⚠️ Wandb log failed during test: {e}")
 
     # Visualize predictions if requested
     if visualize and output_dir:
@@ -199,7 +192,7 @@ def main():
         lab.log(f"📡 Wandb tracking: {'enabled' if log_to_wandb else 'disabled'}")
 
         # Initialize wandb if requested and available
-        if log_to_wandb and wandb is not None:
+        if log_to_wandb:
             try:
                 wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"), config=config, name=f"{model_name}-{lab.job.id}" if hasattr(lab, "job") else model_name)
                 lab.log("✅ Wandb initialized")
@@ -256,7 +249,7 @@ def main():
         test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="after")
 
         # Finish wandb if used
-        if wandb is not None:
+        if log_to_wandb:
             try:
                 wandb.finish()
             except Exception:

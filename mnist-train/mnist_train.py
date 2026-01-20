@@ -14,6 +14,9 @@ except Exception:
 # Add a module-level flag that will be set in main()
 use_wandb = False
 
+# New: how often to save prediction visualizations (in global steps). Default 200.
+prediction_save_every_steps = 200
+
 # Define the model
 class Net(nn.Module):
     def __init__(self):
@@ -44,17 +47,18 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
         loss.backward()
         optimizer.step()
 
-        # Save prediction images at each training step if visualization enabled
+        # Save prediction images at configured intervals if visualization enabled
         if visualize and output_dir is not None:
             # global step index across epochs (0-based)
             global_step = (epoch - 1) * total_batches + batch_idx
-            # Save every 10 global steps
-            if global_step % 10 == 0:
+            # Save every `prediction_save_every_steps` global steps (default 200).
+            if prediction_save_every_steps and prediction_save_every_steps > 0 and (global_step % prediction_save_every_steps == 0):
                 try:
                     # prepare a small batch of images/preds (convert to cpu numpy)
                     imgs = data.cpu().numpy()
                     preds = output.argmax(dim=1, keepdim=True).cpu().numpy()
-                    visualize_predictions(imgs[:10], preds[:10], output_dir, stage=f"step_{global_step}")
+                    # zero-pad step index for filenames (e.g. step_000, step_200)
+                    visualize_predictions(imgs[:10], preds[:10], output_dir, stage=f"step_{global_step:03d}")
                 except Exception as e:
                     lab.log(f"⚠️ Visualization failed at step {global_step}: {e}")
 
@@ -179,6 +183,11 @@ def main():
         # Wandb flag from config (default False)
         log_to_wandb = bool(config.get("log_to_wandb", False))
 
+        # Set prediction save frequency from config (can set 200 or 100)
+        global prediction_save_every_steps
+        prediction_save_every_steps = int(config.get("prediction_save_every_steps", 200) or 200)
+        lab.log(f"Prediction visualizations will be saved every {prediction_save_every_steps} global steps")
+
         # Log configuration details
         lab.log("🚀 Starting MNIST training task...")
         lab.log(f"📋 Model: {model_name}")
@@ -228,10 +237,13 @@ def main():
         model = Net().to(device)
         optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
 
-        # Evaluate before training (also save step_0)
-        lab.log("🔍 Evaluating model before training...")
-        # call test to save "before" snapshot
-        test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="before")
+        # Evaluate before training (skip if step_000 will be produced)
+        if not (prediction_save_every_steps and prediction_save_every_steps > 0):
+            lab.log("🔍 Evaluating model before training...")
+            # call test to save "before" snapshot
+            test(model, device, test_loader, visualize=True, output_dir=output_dir, stage="before")
+        else:
+            lab.log(f"Skipping explicit 'before' snapshot since predictions will be saved at step_000 (every {prediction_save_every_steps} steps)")
 
         # Training loop
         for epoch in range(1, epochs + 1):

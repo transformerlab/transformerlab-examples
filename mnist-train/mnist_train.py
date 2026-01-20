@@ -69,9 +69,16 @@ def train(model, device, train_loader, optimizer, epoch, log_interval, total_epo
             percent = max(0, min(percent, 100))
             lab.log(f"📊 Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)}] Loss: {loss.item():.6f}")
             lab.update_progress(percent)
-            # Log to wandb if enabled
+            # Ensure wandb is initialized (init here as well) and log if available
             try:
-                wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx, "train/progress": percent})
+                if getattr(wandb, "run", None) is None:
+                    try:
+                        wandb.init(project=os.environ.get("WANDB_PROJECT", "mnist-training-project"))
+                        lab.log("✅ Wandb initialized in train()")
+                    except Exception as ie:
+                        lab.log(f"⚠️ Wandb init in train failed: {ie}")
+                if getattr(wandb, "run", None) is not None:
+                    wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx, "train/progress": percent})
             except Exception as e:
                 lab.log(f"⚠️ Wandb log failed during train: {e}")
 

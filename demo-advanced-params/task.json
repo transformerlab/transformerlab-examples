@@ -1,0 +1,91 @@
+{
+  "title": "Advanced Parameter Demo Task",
+  "name": "advanced-params-demo",
+  "description": "Demonstrates all parameter types: shorthand strings, integers with sliders, floats, booleans with switches, enums with radio/select, and password fields",
+  "command": "python main.py",
+  "parameters": {
+    "project_name": "my-experiment",
+    
+    "batch_size": {
+      "type": "int",
+      "default": 32,
+      "min": 1,
+      "max": 128,
+      "multipleOf": 1,
+      "ui_widget": "slider",
+      "title": "Batch Size"
+    },
+    
+    "learning_rate": {
+      "type": "float",
+      "default": 0.0001,
+      "min": 0.00001,
+      "max": 0.01,
+      "multipleOf": 0.00001,
+      "title": "Learning Rate"
+    },
+    
+    "use_amp": {
+      "type": "bool",
+      "default": true,
+      "ui_widget": "switch",
+      "title": "Use Automatic Mixed Precision"
+    },
+    
+    "optimizer": {
+      "type": "enum",
+      "default": "adamw",
+      "options": ["adamw", "sgd", "adafactor"],
+      "ui_widget": "radio",
+      "title": "Optimizer"
+    },
+    
+    "scheduler": {
+      "type": "enum",
+      "default": "cosine",
+      "options": ["constant", "linear", "cosine", "polynomial"],
+      "title": "Learning Rate Scheduler"
+    },
+    
+    "api_key": {
+      "type": "string",
+      "default": "",
+      "ui_widget": "password",
+      "title": "API Key"
+    },
+    
+    "num_epochs": {
+      "type": "integer",
+      "default": 10,
+      "min": 1,
+      "max": 100,
+      "title": "Number of Epochs"
+    },
+    
+    "temperature": {
+      "type": "number",
+      "default": 0.7,
+      "min": 0.0,
+      "max": 2.0,
+      "multipleOf": 0.1,
+      "ui_widget": "slider",
+      "title": "Temperature"
+    },
+    
+    "enable_logging": {
+      "type": "boolean",
+      "default": false,
+      "title": "Enable Logging"
+    },
+    
+    "max_tokens": {
+      "type": "int",
+      "default": 2048,
+      "min": 128,
+      "max": 8192,
+      "multipleOf": 128,
+      "ui_widget": "range",
+      "title": "Max Tokens"
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "title": "MNIST Train Task",
+  "name": "mnist-train",
+  "command": "python ~/mnist-train/mnist_train.py",
+  "env_vars": {
+    "WANDB_PROJECT": "mnist-training-project",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "cpus": "1",
+  "memory": "4",
+  "setup": "uv pip install torch torchvision wandb transformerlab matplotlib",
+  "description": "A task to train a neural network on the MNIST handrwritten digits dataset using PyTorch."
+}

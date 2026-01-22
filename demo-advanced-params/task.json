@@ -6,6 +6,20 @@
   "parameters": {
     "project_name": "my-experiment",
     
+    "model": {
+      "type": "string",
+      "default": "gpt2",
+      "ui_widget": "lab_model_select",
+      "title": "Model"
+    },
+    
+    "dataset": {
+      "type": "string",
+      "default": "wikitext",
+      "ui_widget": "lab_dataset_select",
+      "title": "Dataset"
+    },
+    
     "batch_size": {
       "type": "int",
       "default": 32,

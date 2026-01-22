@@ -11,7 +11,7 @@
       "default": 32,
       "min": 1,
       "max": 128,
-      "step": 1,
+      "multipleOf": 1,
       "ui_widget": "slider",
       "title": "Batch Size"
     },
@@ -21,7 +21,7 @@
       "default": 0.0001,
       "min": 0.00001,
       "max": 0.01,
-      "step": 0.00001,
+      "multipleOf": 0.00001,
       "title": "Learning Rate"
     },
     
@@ -57,17 +57,17 @@
     "num_epochs": {
       "type": "integer",
       "default": 10,
-      "minimum": 1,
-      "maximum": 100,
+      "min": 1,
+      "max": 100,
       "title": "Number of Epochs"
     },
     
     "temperature": {
       "type": "number",
       "default": 0.7,
-      "minimum": 0.0,
-      "maximum": 2.0,
-      "step": 0.1,
+      "min": 0.0,
+      "max": 2.0,
+      "multipleOf": 0.1,
       "ui_widget": "slider",
       "title": "Temperature"
     },
@@ -83,7 +83,7 @@
       "default": 2048,
       "min": 128,
       "max": 8192,
-      "step": 128,
+      "multipleOf": 128,
       "ui_widget": "range",
       "title": "Max Tokens"
     }

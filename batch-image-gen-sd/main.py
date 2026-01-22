@@ -8,9 +8,7 @@ from huggingface_hub import login
 
 from lab import lab
 
-if os.getenv("HF_API_TOKEN"):
-    token = os.getenv("HF_API_TOKEN")
-    login(token=token)
+login(token="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")
 
 
 def slugify(s: str, maxlen: int = 64) -> str:

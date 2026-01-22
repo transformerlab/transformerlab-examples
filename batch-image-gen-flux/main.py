@@ -18,7 +18,7 @@ def slugify(s: str, maxlen: int = 64) -> str:
 def main():
     lab.init()
     config = lab.get_config()
-    model_dir = config.get("model_dir", "~/flux-klein-model")
+    model_dir = config.get("model_dir", "flux-klein-model")
     model_dir = os.path.expanduser(model_dir)  # ensure ~/ is expanded
     output_dir = config.get("output_dir", "./generated-images")
     prompts = config.get(
@@ -39,7 +39,11 @@ def main():
     for i, prompt in enumerate(prompts):
         safe_name = f"{i:02d}_{slugify(prompt)}.png"
         out_path = os.path.join(output_dir, safe_name)
-        cmd = f"flux -d {shlex.quote(model_dir)} -p {shlex.quote(prompt)} -o {shlex.quote(out_path)}"
+        flux_dir = "flux2.c"
+        if os.path.isdir(flux_dir):
+            cmd = f"cd {shlex.quote(flux_dir)} && ./flux -d {shlex.quote(model_dir)} -p {shlex.quote(prompt)} -o {shlex.quote(out_path)}"
+        else:
+            cmd = f"./flux -d {shlex.quote(model_dir)} -p {shlex.quote(prompt)} -o {shlex.quote(out_path)}"
         lab.log(f"[{i}/{total}] Running: {cmd}")
 
         start_time = perf_counter()

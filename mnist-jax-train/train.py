@@ -13,18 +13,15 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.training import train_state
+from flax import serialization
 import optax
 
 # PyTorch imports
-import torch
-import torch.nn as tnn
-import torch.nn.functional as F
-import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 
 # Track whether wandb successfully initialized (or anonymous allowed)
-wandb_enabled = False
+wandb_enabled = True
 
 # How often (global steps) to save prediction visualizations. Default 200.
 prediction_save_every_steps = 200
@@ -42,23 +39,6 @@ class FlaxCNN(nn.Module):
         x = nn.relu(x)
         x = nn.Dense(10)(x)
         return x
-
-class TorchCNN(tnn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = tnn.Conv2d(1, 32, 3, 1)
-        self.conv2 = tnn.Conv2d(32, 64, 3, 1)
-        self.fc1 = tnn.Linear(9216, 128)
-        self.fc2 = tnn.Linear(128, 10)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.max_pool2d(x, 2)
-        x = torch.flatten(x, 1)
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return F.log_softmax(x, dim=1)
 
 def make_dataloaders(batch_size):
     transform = transforms.ToTensor()
@@ -89,46 +69,6 @@ def jax_train_step(state, batch_images, batch_labels):
     state = state.apply_gradients(grads=grads)
     acc = jnp.mean(jnp.argmax(logits, -1) == batch_labels)
     return state, loss, acc
-
-def train_torch(model, device, train_loader, optimizer, epoch, log_interval, lab_facade, output_dir):
-    model.train()
-    total_batches = len(train_loader)
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-        optimizer.zero_grad()
-        output = model(data)
-        loss = F.nll_loss(output, target)
-        loss.backward()
-        optimizer.step()
-
-        global_step = (epoch - 1) * total_batches + batch_idx
-
-        if batch_idx % log_interval == 0:
-            lab_facade.log(f"Epoch {epoch} [{batch_idx}/{len(train_loader)}] loss={loss.item():.4f}")
-            try:
-                if wandb_enabled:
-                    import wandb
-                    wandb.log({"train/loss": loss.item(), "train/epoch": epoch, "train/batch": batch_idx}, step=global_step)
-            except Exception:
-                pass
-
-        # Save prediction visualizations every N global steps
-        if prediction_save_every_steps and prediction_save_every_steps > 0 and (global_step % prediction_save_every_steps == 0):
-            try:
-                # use a small subset (first up to 10 images)
-                imgs = data.detach().cpu().numpy()  # (B, C, H, W)
-                preds = output.detach().cpu().argmax(dim=1).cpu().numpy()
-                vis_path = os.path.join(output_dir, f"preds_epoch{epoch}_step{global_step}.png")
-                saved = visualize_predictions(imgs, preds, os.path.dirname(vis_path), stage=f"epoch{epoch}_step{global_step}")
-                if saved:
-                    lab_facade.log(f"Saved predictions visualization: {saved}")
-            except Exception as e:
-                lab_facade.log(f"⚠️ Failed to save predictions: {e}")
-
-    # save snapshot of state
-    path = os.path.join(output_dir, f"torch_model_epoch_{epoch}.pt")
-    torch.save(model.state_dict(), path)
-    return path
 
 def visualize_predictions(images, predictions, output_dir, stage="predictions"):
     """
@@ -202,11 +142,10 @@ def main():
     global prediction_save_every_steps, wandb_enabled
     prediction_save_every_steps = int(config.get("prediction_save_every_steps", prediction_save_every_steps) or prediction_save_every_steps)
 
-    # Always attempt a wandb login (anonymous allowed) so logging is enabled by default
     try:
         import wandb
         try:
-            wandb.login(anonymous="allow", key=os.environ.get("WANDB_API_KEY", None))
+            wandb.login(key=os.environ.get("WANDB_API_KEY", None))
             lab.log("🔐 Wandb login attempted (anonymous allowed)")
         except Exception:
             lab.log("⚠️ Wandb login attempt failed or anonymous login unavailable")
@@ -233,7 +172,6 @@ def main():
     epochs = int(config.get("epochs", 1))
     batch_size = int(config.get("batch_size", 64))
     lr = float(config.get("learning_rate", 1e-3))
-    log_interval = int(config.get("log_interval", 100))
 
     os.makedirs(output_dir, exist_ok=True)
     start_time = datetime.now()
@@ -246,9 +184,25 @@ def main():
 
         # load data via torchvision and convert to NHWC numpy
         # use small local loader for compatibility
-        _, test_loader = make_dataloaders(batch_size)
         train_ds = datasets.MNIST("./data", train=True, download=True, transform=transforms.ToTensor())
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, drop_last=True)
+
+        # --- initial prediction save at epoch 0 ---
+        try:
+            batch0 = next(iter(train_loader))
+            images0, _ = batch0
+            imgs0 = images0.numpy().astype(np.float32)
+            imgs0 = np.transpose(imgs0, (0, 2, 3, 1))
+            imgs0 = (imgs0 - 0.1307) / 0.3081
+            logits0 = state.apply_fn({"params": state.params}, jnp.array(imgs0))
+            preds0 = np.array(jnp.argmax(logits0, -1))
+            imgs0_chw = np.transpose(imgs0, (0, 3, 1, 2))
+            saved0 = visualize_predictions(imgs0_chw, preds0, output_dir, stage="epoch0_step0")
+            if saved0:
+                lab.log(f"Saved initial predictions visualization: {saved0}")
+        except Exception as e:
+            lab.log(f"⚠️ Failed to save initial JAX predictions: {e}")
+        # --- end initial save ---
 
         total_batches = len(train_loader)
         for epoch in range(1, epochs + 1):
@@ -268,6 +222,18 @@ def main():
                 steps += 1
 
                 global_step = (epoch - 1) * total_batches + steps
+
+                # Log loss at each step (and step-level wandb)
+                try:
+                    lab.log(f"[JAX] step {global_step} loss={float(loss):.4f}")
+                except Exception:
+                    pass
+                try:
+                    if wandb_enabled:
+                        import wandb
+                        wandb.log({"train/loss": float(loss), "train/step_acc": float(acc)}, step=global_step)
+                except Exception:
+                    pass
 
                 # Save prediction visualizations every N global steps
                 if prediction_save_every_steps and prediction_save_every_steps > 0 and (global_step % prediction_save_every_steps == 0):
@@ -296,7 +262,7 @@ def main():
             lab.update_progress(int(50 * epoch / epochs))
 
             # save params snapshot
-            params_bytes = jax.serialization.to_state_dict(state.params)
+            params_bytes = serialization.to_state_dict(state.params)
             params_path = os.path.join(output_dir, f"flax_params_epoch_{epoch}.npz")
             np.savez(params_path, **jax.tree_util.tree_map(lambda x: np.array(x), params_bytes))
             try:
@@ -311,43 +277,9 @@ def main():
         lab.finish("Training completed successfully (JAX)")
         return {"status": "success", "framework": "jax", "duration": str(training_duration), "output_dir": output_dir}
 
-    elif framework == "pytorch":
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        train_loader, test_loader = make_dataloaders(batch_size)
-
-        model = TorchCNN().to(device)
-        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=0.9)
-
-        for epoch in range(1, epochs + 1):
-            path = train_torch(model, device, train_loader, optimizer, epoch, log_interval, lab, output_dir)
-            lab.log(f"Saved local checkpoint: {path}")
-            try:
-                saved = lab.save_checkpoint(path, f"torch_epoch_{epoch}")
-                lab.log(f"Saved checkpoint to lab: {saved}")
-            except Exception as e:
-                lab.log(f"Could not save checkpoint via lab: {e}")
-
-            lab.update_progress(int(100 * epoch / epochs))
-
-        # save final model dir
-        model_dir = os.path.join(output_dir, "final_model")
-        os.makedirs(model_dir, exist_ok=True)
-        torch.save(model.state_dict(), os.path.join(model_dir, "pytorch_state.pt"))
-        try:
-            saved_path = lab.save_model(model_dir, name="mnist_torch_model")
-            lab.log(f"Saved model to lab: {saved_path}")
-        except Exception as e:
-            lab.log(f"Could not save model via lab: {e}")
-
-        training_duration = datetime.now() - start_time
-        lab.finish("Training completed successfully (PyTorch)")
-        return {"status": "success", "framework": "pytorch", "duration": str(training_duration), "output_dir": output_dir}
-
     else:
         lab.error(f"Unknown framework: {framework}")
         return {"status": "error", "error": "unknown_framework"}
-
 
 if __name__ == "__main__":
     result = main()

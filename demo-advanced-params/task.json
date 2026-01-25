@@ -6,12 +6,26 @@
   "parameters": {
     "project_name": "my-experiment",
     
+    "model": {
+      "type": "string",
+      "default": "gpt2",
+      "ui_widget": "lab_model_select",
+      "title": "Model"
+    },
+    
+    "dataset": {
+      "type": "string",
+      "default": "wikitext",
+      "ui_widget": "lab_dataset_select",
+      "title": "Dataset"
+    },
+    
     "batch_size": {
       "type": "int",
       "default": 32,
       "min": 1,
       "max": 128,
-      "multipleOf": 1,
+      "step": 1,
       "ui_widget": "slider",
       "title": "Batch Size"
     },
@@ -21,7 +35,7 @@
       "default": 0.0001,
       "min": 0.00001,
       "max": 0.01,
-      "multipleOf": 0.00001,
+      "step": 0.00001,
       "title": "Learning Rate"
     },
     
@@ -67,7 +81,7 @@
       "default": 0.7,
       "min": 0.0,
       "max": 2.0,
-      "multipleOf": 0.1,
+      "step": 0.1,
       "ui_widget": "slider",
       "title": "Temperature"
     },
@@ -83,7 +97,7 @@
       "default": 2048,
       "min": 128,
       "max": 8192,
-      "multipleOf": 128,
+      "step": 128,
       "ui_widget": "range",
       "title": "Max Tokens"
     }

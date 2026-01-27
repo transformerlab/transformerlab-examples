@@ -26,7 +26,7 @@ def main():
     lab.init()
     config = lab.get_config()
 
-    model_name = config.get("model_name", "stabilityai/stable-diffusion-3.5-medium")
+    model_name = config.get("model_name", "CompVis/stable-diffusion-v1-4")
     prompts = config.get(
         "prompts",
         [

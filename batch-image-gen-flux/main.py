@@ -16,6 +16,12 @@ def slugify(s: str, maxlen: int = 64) -> str:
 
     return "".join(keep)[:maxlen].rstrip("_")
 
+def ensure_dir(path: str):
+    """Create directory if it doesn't exist (no-op for empty paths)."""
+    if not path:
+        return
+    os.makedirs(path, exist_ok=True)
+
 def main():
     lab.init()
     config = lab.get_config()
@@ -32,7 +38,7 @@ def main():
         ],
     )
 
-    os.makedirs(output_dir, exist_ok=True)
+    ensure_dir(output_dir)
     lab.log(f"Running batch image generation with model with ({len(prompts)} prompts): {model_dir}")
 
     results = []
@@ -40,6 +46,7 @@ def main():
     for i, prompt in enumerate(prompts):
         safe_name = f"{i:02d}_{slugify(prompt)}.png"
         out_path = os.path.join(output_dir, safe_name)
+        ensure_dir(os.path.dirname(out_path) or output_dir)
         env_dir = os.environ.get("SKY_FLUX_DIR")
         skypilot_path = os.path.expanduser("/home/sky/sky_workdir/flux2.c")
         local_dir = "flux2.c"

@@ -38,6 +38,8 @@ def main():
         ],
     )
 
+    # Ensure output directory exists with absolute path
+    output_dir = os.path.abspath(output_dir)
     ensure_dir(output_dir)
     lab.log(f"Running batch image generation with model with ({len(prompts)} prompts): {model_dir}")
 
@@ -46,7 +48,7 @@ def main():
     for i, prompt in enumerate(prompts):
         safe_name = f"{i:02d}_{slugify(prompt)}.png"
         out_path = os.path.join(output_dir, safe_name)
-        ensure_dir(os.path.dirname(out_path) or output_dir)
+
         env_dir = os.environ.get("SKY_FLUX_DIR")
         skypilot_path = os.path.expanduser("/home/sky/sky_workdir/flux2.c")
         local_dir = "flux2.c"

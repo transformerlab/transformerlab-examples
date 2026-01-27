@@ -3,7 +3,7 @@ from time import perf_counter
 from datetime import datetime
 
 import torch
-from diffusers import DiffusionPipeline
+from diffusers import StableDiffusionPipeline
 from huggingface_hub import login
 
 from lab import lab
@@ -43,9 +43,9 @@ def main():
     load_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
     if torch.cuda.is_available():
         # let accelerate/device_map place weights automatically
-        pipe = DiffusionPipeline.from_pretrained(model_name, torch_dtype=load_dtype, device_map="cuda")
+        pipe = StableDiffusionPipeline.from_pretrained(model_name, torch_dtype=load_dtype, device_map="cuda")
     else:
-        pipe = DiffusionPipeline.from_pretrained(model_name, torch_dtype=load_dtype).to(device)
+        pipe = StableDiffusionPipeline.from_pretrained(model_name, torch_dtype=load_dtype).to(device)
 
     num_inference_steps = int(config.get("num_inference_steps", 25))
     guidance_scale = float(config.get("guidance_scale", 7.5))
@@ -70,6 +70,8 @@ def main():
             ).images[0]
         duration = perf_counter() - start
 
+        # Ensure the target directory exists before saving the image
+        os.makedirs(os.path.dirname(out_path) or output_dir, exist_ok=True)
         image.save(out_path)
         artifact = lab.save_artifact(out_path, name=os.path.basename(out_path), type="image")
         lab.log(f"Saved image artifact: {artifact}")
@@ -85,5 +87,4 @@ def main():
 
 
 if __name__ == "__main__":
-    res = main()
-    print(res)
+    main()

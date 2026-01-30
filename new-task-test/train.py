@@ -8,29 +8,31 @@ from lab import lab
 def train():
     """Fake training function that runs locally but reports to TransformerLab"""
 
-    # Training configuration
-    training_config = {
-        "experiment_name": "alpha",
-        "model_name": "HuggingFaceTB/SmolLM-135M-Instruct",
-        "dataset": "Trelis/touch-rugby-rules",
-        "template_name": "wandb-demo",
-        "output_dir": "./output",
-        "log_to_wandb": True,  # Enable wandb logging for demo
-        "_config": {
-            "dataset_name": "Trelis/touch-rugby-rules",
-            "lr": 2e-5,
-            "num_train_epochs": 1,
-            "batch_size": 8,
-            "gradient_accumulation_steps": 1,
-            "warmup_ratio": 0.03,
-            "weight_decay": 0.01,
-            "max_seq_length": 512,
-        },
-    }
-
     try:
         # Initialize lab with default/simple API
         lab.init()
+        config = lab.get_config()
+
+        # Training configuration with defaults
+        training_config = {
+            "experiment_name": config.get("experiment_name", "alpha"),
+            "model_name": config.get("model_name", "HuggingFaceTB/SmolLM-135M-Instruct"),
+            "dataset": config.get("dataset", "Trelis/touch-rugby-rules"),
+            "template_name": config.get("template_name", "wandb-demo"),
+            "output_dir": config.get("output_dir", "./output"),
+            "log_to_wandb": config.get("log_to_wandb", True),
+            "_config": {
+                "dataset_name": config.get("dataset_name", "Trelis/touch-rugby-rules"),
+                "lr": float(config.get("lr", 2e-5)),
+                "num_train_epochs": int(config.get("num_train_epochs", 1)),
+                "batch_size": int(config.get("batch_size", 8)),
+                "gradient_accumulation_steps": int(config.get("gradient_accumulation_steps", 1)),
+                "warmup_ratio": float(config.get("warmup_ratio", 0.03)),
+                "weight_decay": float(config.get("weight_decay", 0.01)),
+                "max_seq_length": int(config.get("max_seq_length", 512)),
+            },
+        }
+
         lab.set_config(training_config)
 
         # Log start time

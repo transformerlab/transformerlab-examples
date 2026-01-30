@@ -1,5 +1,5 @@
 {
-  "title": "Sample Generate Task",
+  "title": "Dataset Generate Task",
   "name": "sample-generate-task",
   "command": "python ~/demo-generate-task/fake_generate.py",
   "cpus": "2",

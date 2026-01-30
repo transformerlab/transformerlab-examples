@@ -1,0 +1,7 @@
+{
+    "title": "Batch Image Generation with Flux2",
+    "name": "batch-image-gen-flux",
+    "command": "cd ~/batch-image-gen-flux && python main.py",
+    "accelerators": "RTX4090:1",
+    "setup": ""
+}

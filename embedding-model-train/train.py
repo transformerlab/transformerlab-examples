@@ -155,7 +155,7 @@ def train_embedding_model():
         model_name = config.get("model_name", "sentence-transformers/all-MiniLM-L6-v2")
         dataset_name = config.get("dataset_name", "sentence-transformers/stsb")
         output_dir = config.get("output_dir", "./output")
-        log_to_wandb = config.get("log_to_wandb", False)
+        log_to_wandb = config.get("log_to_wandb", True)
 
         # Dataset and loss configuration
         dataset_type = config.get("dataset_type", "anchor | positive")
@@ -330,6 +330,20 @@ def train_embedding_model():
 
         # Configure training arguments
         lab.log("Setting up training arguments...")
+        
+        # Initialize wandb if logging is enabled and API key is provided
+        if log_to_wandb:
+            try:
+                import wandb
+                api_key = os.getenv("WANDB_API_KEY")
+                if api_key:
+                    wandb.login(key=api_key)
+                    lab.log("✅ Wandb login succeeded")
+                else:
+                    lab.log("⚠️ WANDB_API_KEY not set, wandb may use anonymous mode")
+            except Exception as e:
+                lab.log(f"⚠️ Wandb login failed: {e}")
+        
         training_args = SentenceTransformerTrainingArguments(
             output_dir=output_dir,
             logging_dir=os.path.join(output_dir, "logs"),

@@ -2,6 +2,14 @@
     "title": "Batch Image Generation with Flux2",
     "name": "batch-image-gen-flux",
     "command": "cd ~/batch-image-gen-flux && python main.py",
-    "accelerators": "RTX4090:1",
-    "setup": ""
+    "accelerators": "RTX3090:1",
+    "setup": "sudo apt update && sudo apt install -y libopenblas-dev curl && git clone https://github.com/antirez/flux2.c && cd flux2.c && make blas && ./download_model.sh && uv pip install transformerlab",
+    "parameters": {
+        "prompts": [
+            "A fluffy orange cat sitting on a windowsill",
+            "A serene mountain lake at sunrise",
+            "A futuristic city skyline at night with neon lights",
+            "A vintage steam train crossing a snowy bridge"
+        ]
+    }
 }

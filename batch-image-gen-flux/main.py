@@ -37,7 +37,8 @@ def main():
             "A vintage steam train crossing a snowy bridge",
         ],
     )
-    prompts = eval(prompts)
+    if isinstance(prompts, str):
+        prompts = eval(prompts)
 
     # Ensure output directory exists with absolute path
     output_dir = os.path.abspath(output_dir)

@@ -1,0 +1,16 @@
+{
+  "title": "Batch Image Generation with Stable Diffusion",
+  "name": "batch-image-gen-sd",
+  "command": "python ~/batch-image-gen-sd/main.py",
+  "cpus": "2",
+  "memory": "4",
+  "accelerators": "RTX3090:1",
+  "env_vars": {
+    "PYTHONUNBUFFERED": "1",
+    "HF_API_TOKEN": "<your_huggingface_token_here>",
+    "WANDB_API_KEY": "<your_wandb_api_key_here>",
+    "WANDB_PROJECT": "batch-image-gen-sd"
+  },
+  "setup": "uv pip install transformerlab transformers accelerate diffusers huggingface_hub && uv pip install torch --index-url https://download.pytorch.org/whl/cu126",
+  "description": "Batch image generation using Stable Diffusion"
+}

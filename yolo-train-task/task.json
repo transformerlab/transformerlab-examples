@@ -3,7 +3,7 @@
   "name": "yolo-train-task",
   "command": "cd ~/yolo-train-task && python yolo_train_script.py",
   "accelerators": "RTX3090:1",
-  "setup": "uv pip install datasets transformers==4.57.3 torch==2.9.1 wandb ultralytics transformerlab",
+  "setup": "sudo apt update && sudo apt install -y libgl1-mesa-glx libglib2.0-0 && pip install datasets transformers==4.57.3 torch==2.9.1 wandb ultralytics transformerlab",
   "env_vars": {
     "WANDB_API_KEY": "<your_wandb_api_key_here>",
     "WANDB_PROJECT": "yolo-training-project",

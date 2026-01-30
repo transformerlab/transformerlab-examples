@@ -397,7 +397,6 @@ def train_model():
             report_to="wandb" if training_config.get("log_to_wandb", False) else "none",
             ddp_find_unused_parameters=False,
             dataloader_pin_memory=True,
-            no_cuda=False,
             resume_from_checkpoint=checkpoint if checkpoint else None,
         )
 

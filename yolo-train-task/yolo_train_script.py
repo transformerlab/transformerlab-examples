@@ -25,28 +25,30 @@ def train_yolo(quick_test=True):
     # Configure GPU usage
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    # Training configuration
-    training_config = {
-        "model_name": "yolov8n.pt",  # YOLOv8 nano model for faster training
-        "dataset": "coco8",  # Small built-in dataset for demo (8 images from COCO)
-        "task": "detect",  # Object detection task
-        "output_dir": "./yolo_output",
-        "quick_test": quick_test,
-        "_config": {
-            "epochs": 3 if quick_test else 10,
-            "imgsz": 640,  # Image size
-            "batch": 2,  # Batch size - small for demo
-            "lr0": 0.01,  # Initial learning rate
-            "device": 0,  # GPU device
-            "workers": 0,  # Number of worker threads
-            "project": "./yolo_output",
-            "name": "yolo_train",
-        },
-    }
-
     try:
         # Initialize lab with default/simple API
         lab.init()
+        config = lab.get_config()
+
+        # Training configuration with defaults
+        training_config = {
+            "model_name": config.get("model_name", "yolov8n.pt"),  # YOLOv8 nano model for faster training
+            "dataset": config.get("dataset", "coco8"),  # Small built-in dataset for demo (8 images from COCO)
+            "task": config.get("task", "detect"),  # Object detection task
+            "output_dir": config.get("output_dir", "./yolo_output"),
+            "quick_test": quick_test,
+            "_config": {
+                "epochs": int(config.get("epochs", 3 if quick_test else 10)),
+                "imgsz": int(config.get("imgsz", 640)),  # Image size
+                "batch": int(config.get("batch", 2)),  # Batch size - small for demo
+                "lr0": float(config.get("lr0", 0.01)),  # Initial learning rate
+                "device": config.get("device", 0),  # GPU device
+                "workers": int(config.get("workers", 0)),  # Number of worker threads
+                "project": config.get("project", "./yolo_output"),
+                "name": config.get("name", "yolo_train"),
+            },
+        }
+
         lab.set_config(training_config)
 
         # Check if we should resume from a checkpoint

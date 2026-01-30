@@ -8,22 +8,9 @@ from lab import lab
 def generate_dataset():
     """Fake dataset generation function that runs locally but reports to TransformerLab"""
 
-    # Dataset generation configuration
-    config = {
-        "experiment_name": "alpha",
-        "model_name": "HuggingFaceTB/SmolLM-135M-Instruct",
-        "template_name": "dataset-generation-demo",
-        "_config": {
-            "dataset_type": "synthetic",
-            "num_samples": 100,
-            "generation_method": "fake_data",
-        },
-    }
-
     try:
         # Initialize lab with default/simple API
         lab.init()
-        lab.set_config(config)
 
         # Log start time
         start_time = datetime.now()

@@ -1,12 +1,19 @@
 {
     "title": "MNIST JAX Training Task",
     "name": "mnist-jax-train-task",
-    "command": "cd ~/transformerlab-examples && python mnist-jax-train/train.py",
+    "command": "cd ~/mnist-jax-train && python train.py",
     "accelerators": "RTX3090:1",
     "setup": "uv pip install transformerlab jax flax optax matplotlib wandb && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126",
     "env_vars": {
         "WANDB_PROJECT": "mnist-jax-training-project",
-        "PYTHONUNBUFFERED": "1"
+        "PYTHONUNBUFFERED": "1",
+        "WANDB_API_KEY": "<your_wandb_api_key_here>"
+    },
+    "parameters": {
+        "epochs": "1",
+        "batch_size": "64",
+        "learning_rate": "1e-3",
+        "prediction_save_every_steps": "200"
     },
     "description": "A JAX-based training task for MNIST dataset using TransformerLab, leveraging Flax and Optax for model building and optimization."
 }

@@ -1,9 +1,9 @@
 {
   "title": "YOLO Train Task",
   "name": "yolo-train-task",
-  "command": "python ~/yolo-train-task/yolo_train_script.py",
+  "command": "cd ~/yolo-train-task && python yolo_train_script.py",
   "accelerators": "RTX3090:1",
-  "setup": "pip install datasets transformers==4.57.3 torch==2.9.1 wandb ultralytics transformerlab",
+  "setup": "uv pip install datasets transformers==4.57.3 torch==2.9.1 wandb ultralytics transformerlab",
   "parameters": {
     "epochs": "3",
     "batch": "2",

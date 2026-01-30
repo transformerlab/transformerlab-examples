@@ -9,5 +9,11 @@
         "PYTHONUNBUFFERED": "1",
         "WANDB_API_KEY": "<your_wandb_api_key_here>"
     },
+    "parameters": {
+        "epochs": "1",
+        "batch_size": "64",
+        "learning_rate": "1e-3",
+        "prediction_save_every_steps": "200"
+    },
     "description": "A JAX-based training task for MNIST dataset using TransformerLab, leveraging Flax and Optax for model building and optimization."
 }

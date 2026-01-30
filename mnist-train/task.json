@@ -1,13 +1,24 @@
 {
   "title": "MNIST Train Task",
   "name": "mnist-train",
-  "command": "python ~/mnist-train/mnist_train.py",
+  "command": "cd ~/mnist-train && python mnist_train.py",
   "env_vars": {
+    "WANDB_API_KEY": "<your_wandb_api_key_here>",
     "WANDB_PROJECT": "mnist-training-project",
     "PYTHONUNBUFFERED": "1"
   },
   "cpus": "1",
   "memory": "4",
   "setup": "uv pip install torch torchvision wandb transformerlab matplotlib",
-  "description": "A task to train a neural network on the MNIST handrwritten digits dataset using PyTorch."
+  "parameters": {
+    "seed": "42",
+    "epochs": "1",
+    "batch_size": "64",
+    "test_batch_size": "1000",
+    "learning_rate": "0.01",
+    "momentum": "0.5",
+    "log_interval": "10",
+    "prediction_save_every_steps": "200"
+  },
+  "description": "A task to train a neural network on the MNIST handrwritten digits dataset on a custom CNN with PyTorch."
 }

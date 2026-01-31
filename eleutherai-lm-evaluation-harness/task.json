@@ -1,7 +1,7 @@
 {
   "title": "EleutherAI LM Evaluation Harness",
   "name": "eleuther-ai-lm-evaluation-harness",
-  "command": "cd ~/eleuther-ai-lm-evaluation-harness && python train.py",
+  "command": "cd ~/eleutherai-lm-evaluation-harness && python train.py",
   "accelerators": "RTX3090:1",
   "setup": "uv pip install transformerlab lm_eval==0.4.7 pandas torch",
   "env_vars": {

@@ -1,0 +1,14 @@
+{
+  "title": "Video Generation using Wan Task",
+  "name": "video-generation-wan-task",
+  "command": "cd ~/video-diffusion && python main.py",
+  "accelerators": "RTX3090:1",
+  "setup": "uv pip install transformerlab diffusers ftfy huggingface-hub opencv-python && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126",
+  "env_vars": {
+    "WANDB_PROJECT": "unsloth-llm-training",
+    "PYTHONUNBUFFERED": "1",
+    "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
+    "WANDB_API_KEY": "ENTER YOUR WANDB_API_KEY HERE"
+  },
+  "description": "Video generation task using Wan2.1 models. Requires a Hugging Face token in HF_TOKEN env var for model access."
+}

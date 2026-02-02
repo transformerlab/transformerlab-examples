@@ -129,41 +129,68 @@ def train_model():
     # Configure GPU usage - use only GPU 0
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    # Training configuration
-    training_config = {
-        "experiment_name": "unsloth-tts-training",
-        "model_name": "unsloth/orpheus-3b-0.1-ft",  # Small model for testing
-        "dataset": "bosonai/EmergentTTS-Eval",  # Example dataset
-        "template_name": "unsloth-tts-demo",
-        "output_dir": "./output",
-        "log_to_wandb": False,
-        "_config": {
-            "dataset_name": "bosonai/EmergentTTS-Eval",
-            "audio_column_name": "audio",
-            "text_column_name": "text_to_synthesize",
-            "lora_alpha": 32,
-            "lora_dropout": 0.0,
-            "lora_r": 16,
-            "maximum_sequence_length": 1024,
-            "max_grad_norm": 0.3,
-            "learning_rate": 5e-05,
-            "learning_rate_schedule": "linear",
-            "batch_size": 1,
-            "num_train_epochs": 1,
-            "weight_decay": 0.0,
-            "adam_beta1": 0.9,
-            "adam_beta2": 0.999,
-            "adam_epsilon": 1e-08,
-            # "report_to": "wandb",
-            "sampling_rate": 24000,
-            "max_steps": -1,
-            "model_architecture": "OrpheusForConditionalGeneration",
-            "device": "cuda" if torch.cuda.is_available() else "cpu",
-        },
-    }
     try:
-        # Initialize lab with default/simple API
+        # Initialize lab
         lab.init()
+
+        # Get parameters from task configuration
+        config = lab.get_config()
+
+        # Extract parameters with defaults
+        model_name = config.get("model_name", "unsloth/orpheus-3b-0.1-ft")
+        dataset = config.get("dataset", "bosonai/EmergentTTS-Eval")
+        audio_column_name = config.get("audio_column_name", "audio")
+        text_column_name = config.get("text_column_name", "text_to_synthesize")
+        lora_alpha = config.get("lora_alpha", 32)
+        lora_dropout = config.get("lora_dropout", 0.0)
+        lora_r = config.get("lora_r", 16)
+        maximum_sequence_length = config.get("maximum_sequence_length", 1024)
+        max_grad_norm = config.get("max_grad_norm", 0.3)
+        learning_rate = config.get("learning_rate", 5e-05)
+        learning_rate_schedule = config.get("learning_rate_schedule", "linear")
+        batch_size = config.get("batch_size", 1)
+        num_train_epochs = config.get("num_train_epochs", 1)
+        weight_decay = config.get("weight_decay", 0.0)
+        adam_beta1 = config.get("adam_beta1", 0.9)
+        adam_beta2 = config.get("adam_beta2", 0.999)
+        adam_epsilon = config.get("adam_epsilon", 1e-08)
+        sampling_rate = config.get("sampling_rate", 24000)
+        max_steps = config.get("max_steps", -1)
+        model_architecture = config.get("model_architecture", "OrpheusForConditionalGeneration")
+
+        # Training configuration
+        training_config = {
+            "experiment_name": "unsloth-tts-training",
+            "model_name": model_name,
+            "dataset": dataset,
+            "template_name": "unsloth-tts-demo",
+            "output_dir": "./output",
+            "log_to_wandb": False,
+            "_config": {
+                "dataset_name": dataset,
+                "audio_column_name": audio_column_name,
+                "text_column_name": text_column_name,
+                "lora_alpha": lora_alpha,
+                "lora_dropout": lora_dropout,
+                "lora_r": lora_r,
+                "maximum_sequence_length": maximum_sequence_length,
+                "max_grad_norm": max_grad_norm,
+                "learning_rate": learning_rate,
+                "learning_rate_schedule": learning_rate_schedule,
+                "batch_size": batch_size,
+                "num_train_epochs": num_train_epochs,
+                "weight_decay": weight_decay,
+                "adam_beta1": adam_beta1,
+                "adam_beta2": adam_beta2,
+                "adam_epsilon": adam_epsilon,
+                # "report_to": "wandb",
+                "sampling_rate": sampling_rate,
+                "max_steps": max_steps,
+                "model_architecture": model_architecture,
+                "device": "cuda" if torch.cuda.is_available() else "cpu",
+            },
+        }
+
         lab.set_config(training_config)
 
         checkpoint = lab.get_checkpoint_to_resume()
@@ -287,7 +314,7 @@ def train_model():
                 )
             else:
                 lab.log(
-                    f"❌ Model architecture {training_config['_config']['model_architecture']} is not supported for audio training."
+                    f"❌ Model architecture {training_config['_config']['model_architecture']} is not supported for audio training. Please use 'CsmForConditionalGeneration' or 'OrpheusForConditionalGeneration'."
                 )
                 lab.finish("Training failed due to unsupported model architecture.")
                 return {"status": "error", "error": "Unsupported model architecture."}

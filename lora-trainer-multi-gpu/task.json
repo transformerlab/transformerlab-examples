@@ -6,6 +6,7 @@
   "setup": "uv pip install transformers trl peft bitsandbytes accelerate transformerlab datasets",
   "env_vars": {
     "WANDB_PROJECT": "lora-multi-gpu-training",
+    "WANDB_API_KEY": "ENTER YOUR WANDB_API_KEY HERE",
     "PYTHONUNBUFFERED": "1",
     "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE"
   },

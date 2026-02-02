@@ -62,20 +62,43 @@ def main():
 
         # Get configuration parameters with defaults
         output_dir = config.get("output_dir", "./tagged_images")
-        threshold = float(config.get("threshold", 0.35))  # Confidence threshold for tags
+        threshold = float(config.get("threshold", 0.35))
         model_name = config.get("model_name", "SmilingWolf/wd-v1-4-swinv2-tagger-v2")
+        dataset_name = config.get("dataset_name", "cifar10")
+        num_images = int(config.get("num_images", 10))
+        split = config.get("split", "train")
 
-        # Load 10 images from CIFAR-10 dataset
-        lab.log("Loading CIFAR-10 dataset...")
-        cifar10 = datasets.CIFAR10(root='./data', train=True, download=True)
+        # Load dataset using Hugging Face datasets library
+        lab.log(f"Loading dataset: {dataset_name} (split: {split})")
+        try:
+            from datasets import load_dataset
+            dataset = load_dataset(dataset_name, split=split)
+            
+            # Dynamically find the image column (check common names)
+            possible_image_columns = ["image", "img", "picture"]
+            image_column = None
+            for col in possible_image_columns:
+                if col in dataset.column_names:
+                    image_column = col
+                    break
+            if image_column is None:
+                raise ValueError(f"Dataset '{dataset_name}' does not have a recognized image column ({possible_image_columns}). Please choose a dataset with image data.")
+            
+            lab.log(f"✅ Loaded dataset with {len(dataset)} examples (using '{image_column}' column for images)")
+        except Exception as e:
+            lab.log(f"❌ Failed to load dataset '{dataset_name}': {e}")
+            raise RuntimeError(f"Could not load dataset '{dataset_name}'. Ensure it's a valid Hugging Face dataset name and 'datasets' library is installed.")
+
+        # Select and save images to temporary files
         temp_dir = tempfile.mkdtemp()
         image_paths = []
-        for i in range(10):
-            img, label = cifar10[i]
-            img_path = os.path.join(temp_dir, f"cifar_{i}.png")
+        actual_num_images = min(num_images, len(dataset))
+        for i in range(actual_num_images):
+            img = dataset[i][image_column]  # Use the detected image column
+            img_path = os.path.join(temp_dir, f"image_{i}.png")
             img.save(img_path)
             image_paths.append(img_path)
-        lab.log("✅ Loaded 10 images from CIFAR-10")
+        lab.log(f"✅ Prepared {actual_num_images} images from {dataset_name}")
 
         # Ensure output directory exists
         os.makedirs(output_dir, exist_ok=True)
@@ -84,7 +107,8 @@ def main():
         start_time = datetime.now()
         lab.log(f"Auto-tagging started at {start_time}")
         lab.log(f"Model: {model_name}")
-        lab.log(f"Number of images: {len(image_paths)}")
+        lab.log(f"Dataset: {dataset_name} ({split} split)")
+        lab.log(f"Number of images: {actual_num_images}")
         lab.log(f"Output directory: {output_dir}")
         lab.log(f"Tag threshold: {threshold}")
 
@@ -169,6 +193,8 @@ def main():
         with open(summary_file, "w") as f:
             json.dump({
                 "model": model_name,
+                "dataset": dataset_name,
+                "split": split,
                 "total_images": total_images,
                 "threshold": threshold,
                 "results": results,
@@ -192,7 +218,8 @@ def main():
             "duration": str(duration),
             "output_dir": output_dir,
             "total_images": total_images,
-            "model": model_name
+            "model": model_name,
+            "dataset": dataset_name
         }
 
     except Exception as e:

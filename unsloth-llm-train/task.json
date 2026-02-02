@@ -10,5 +10,23 @@
     "HF_TOKEN": "ENTER YOUR HF_TOKEN HERE",
     "WANDB_API_KEY": "ENTER YOUR WANDB_API_KEY HERE"
   },
+  "parameters": {
+    "model_name": "unsloth/Qwen2.5-0.5B-Instruct",
+    "dataset": "Trelis/touch-rugby-rules",
+    "lr": 0.0002,
+    "num_train_epochs": 1,
+    "batch_size": 2,
+    "gradient_accumulation_steps": 4,
+    "warmup_steps": 5,
+    "max_steps": 10,
+    "max_seq_length": 2048,
+    "lora_r": 16,
+    "lora_alpha": 16,
+    "lora_dropout": 0.05,
+    "logging_steps": 1,
+    "save_steps": 50,
+    "weight_decay": 0.01,
+    "dataloader_num_workers": 0
+  },
   "description": "LLM training task using Unsloth FastLanguageModel with LoRA fine-tuning. Requires a Hugging Face token in HF_TOKEN env var for model access."
 }

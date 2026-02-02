@@ -197,6 +197,18 @@ def train_model():
         lab.init()
         lab.set_config(training_config)
 
+        if training_config.get("log_to_wandb", False):
+            try:
+                import wandb
+                api_key = os.getenv("WANDB_API_KEY")
+                if api_key:
+                    wandb.login(key=api_key)
+                    lab.log("✅ WandB login succeeded")
+                else:
+                    lab.log("⚠️ WANDB_API_KEY not set, WandB may use anonymous mode")
+            except Exception as e:
+                lab.log(f"⚠️ WandB login failed: {e}")
+
         checkpoint = lab.get_checkpoint_to_resume()
         if checkpoint:
             lab.log(f"📁 Resuming training from checkpoint: {checkpoint}")

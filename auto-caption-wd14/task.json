@@ -1,0 +1,8 @@
+{
+    "title": "Auto Tagging Images using WD14 Auto Captioner",
+    "name": "auto-caption-wd14",
+    "command": "cd ~/auto-caption-wd14 && python main.py",
+    "accelerators": "RTX3090:1",
+    "setup": "uv pip install transformerlab torchvision huggingface-hub ",
+    "description": "This task uses the WD14 Auto Captioner model to generate descriptive captions for images. It leverages the capabilities of the TransformerLab library for image captioning."
+}

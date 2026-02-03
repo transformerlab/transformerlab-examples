@@ -1,4 +1,6 @@
 name: nanochat-train-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: nanochat
 resources:
   accelerators: "H100:8"
 setup: "uv pip install transformerlab torch torchvision torchaudio transformers datasets wandb;sudo apt update;sudo apt install -y curl git build-essential;"

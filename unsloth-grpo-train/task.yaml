@@ -1,4 +1,6 @@
 name: unsloth-grpo-train-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: unsloth-grpo-train
 resources:
   accelerators: "A100-80GB:1"
 setup: "uv pip install trl bitsandbytes unsloth transformerlab datasets jinja2"

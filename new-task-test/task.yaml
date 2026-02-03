@@ -1,4 +1,6 @@
 name: fake-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: new-task-test
 resources:
   cpus: 2
   memory: 4

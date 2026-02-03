@@ -12,7 +12,7 @@
   },
   "parameters": {
     "depth": "20",
-    "nproc_per_node": "8",
+    "nproc_per_node": "1",
     "enable_rl": "false",
     "log_to_wandb": "true"
   },

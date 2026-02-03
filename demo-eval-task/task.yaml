@@ -1,0 +1,8 @@
+name: sample-eval-task
+resources:
+  cpus: 2
+  memory: 4
+setup: "uv pip install transformerlab datasets;"
+run: "python ~/demo-eval-task/fake_evals.py"
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: demo-eval-task

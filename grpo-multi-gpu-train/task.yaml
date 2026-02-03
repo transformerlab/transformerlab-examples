@@ -1,0 +1,10 @@
+name: grpo-multi-gpu-train-task
+resources:
+  accelerators: "A100-80GB:1"
+setup: "uv pip install trl bitsandbytes accelerate transformerlab datasets jinja2 wandb"
+run: "cd ~/grpo-multi-gpu-train && python train.py"
+envs:
+  WANDB_PROJECT: "grpo-multi-gpu-training"
+  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"

@@ -360,111 +360,27 @@ def main():
         
         lab.log(f"Training data directory: {base_dir}")
         
-        # Clone nanochat repository if not exists
-        nanochat_dir = os.path.expanduser("~/nanochat")
-        if not os.path.exists(nanochat_dir):
-            lab.log("📥 Cloning nanochat repository...")
+        # Clone nanochat repository if not exists or if it's not a valid repo
+        # We use ~/nanochat-repo to avoid collision with potential workspace folders named 'nanochat'
+        nanochat_dir = os.path.abspath(os.path.expanduser("~/nanochat-repo"))
+        
+        if not os.path.exists(nanochat_dir) or not os.path.exists(os.path.join(nanochat_dir, "pyproject.toml")):
+            if os.path.exists(nanochat_dir):
+                lab.log(f"⚠️  {nanochat_dir} exists but is missing pyproject.toml. Re-cloning...")
+                import shutil
+                try:
+                    shutil.rmtree(nanochat_dir)
+                except Exception:
+                    pass
+            
+            lab.log(f"📥 Cloning nanochat repository to {nanochat_dir}...")
             run_command(
-                "git clone https://github.com/karpathy/nanochat.git ~/nanochat",
+                f"git clone https://github.com/karpathy/nanochat.git {nanochat_dir}",
                 "Cloning nanochat repository",
                 stream_output=True
             )
         else:
-            lab.log(f"✅ Nanochat directory found: {nanochat_dir}")
-        
-        # Verify that the clone has the required pyproject.toml
-        pyproject_path = os.path.join(nanochat_dir, "pyproject.toml")
-        if not os.path.exists(pyproject_path):
-            lab.log("⚠️  pyproject.toml not found in cloned nanochat repo, re-cloning...")
-            # Remove the incomplete clone and re-clone
-            run_command(f"rm -rf {nanochat_dir}", "Removing incomplete clone", stream_output=False)
-            run_command(
-                "git clone https://github.com/karpathy/nanochat.git ~/nanochat",
-                "Re-cloning nanochat repository",
-                stream_output=True
-            )
-            # Double-check after re-clone
-            if not os.path.exists(pyproject_path):
-                lab.log("❌ Still no pyproject.toml after re-clone, creating it manually...")
-                # Create the pyproject.toml with the content from the repo
-                pyproject_content = '''# target torch to cuda 12.8 or CPU
-[tool.uv.sources]
-torch = [
-    { index = "pytorch-cpu", extra = "cpu" },
-    { index = "pytorch-cu128", extra = "gpu" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
-[project.optional-dependencies]
-cpu = [
-    "torch>=2.9.1",
-]
-gpu = [
-    "torch>=2.9.1",
-]
-
-[tool.uv]
-conflicts = [
-    [
-        { extra = "cpu" },
-        { extra = "gpu" },
-    ],
-]
-
-[project]
-name = "nanochat"
-version = "0.1.0"
-description = "the minimal full-stack ChatGPT clone"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "datasets>=4.0.0",
-    "fastapi>=0.117.1",
-    "ipykernel>=7.1.0",
-    "kernels>=0.11.7",
-    "matplotlib>=3.10.8",
-    "psutil>=7.1.0",
-    "python-dotenv>=1.2.1",
-    "regex>=2025.9.1",
-    "rustbpe>=0.1.0",
-    "scipy>=1.15.3",
-    "setuptools>=80.9.0",
-    "tabulate>=0.9.0",
-    "tiktoken>=0.11.0",
-    "tokenizers>=0.22.0",
-    "torch>=2.9.0",
-    "transformers>=4.57.3",
-    "uvicorn>=0.36.0",
-    "wandb>=0.21.3",
-    "zstandard>=0.25.0",
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.0.0",
-]
-
-[tool.pytest.ini_options]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-'''
-                with open(pyproject_path, 'w') as f:
-                    f.write(pyproject_content)
-                lab.log("✅ Created pyproject.toml manually")
+            lab.log(f"✅ Nanochat repository found: {nanochat_dir}")
         
         # Setup WANDB run name
         wandb_run = f"nanochat-speedrun"

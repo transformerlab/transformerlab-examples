@@ -357,8 +357,12 @@ def main():
         config = lab.get_config()
         
         # Extract parameters with defaults
-        depth = config.get("depth", 20)
-        nproc_per_node = config.get("nproc_per_node", 1)
+        try:
+            depth = int(config.get("depth", 20))
+            nproc_per_node = int(config.get("nproc_per_node", 1))
+        except (ValueError, TypeError):
+            depth = 20
+            nproc_per_node = 1
         enable_rl = config.get("enable_rl", False)
         log_to_wandb = config.get("log_to_wandb", False)
         

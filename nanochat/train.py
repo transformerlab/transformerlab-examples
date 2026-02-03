@@ -64,6 +64,28 @@ def run_command(command, description, stream_output=True, cwd=None, env=None):
         raise
 
 
+def get_available_gpus():
+    """Detect the number of available GPUs using nvidia-smi or torch"""
+    try:
+        # Try nvidia-smi first (fast and doesn't require torch in the host env)
+        res = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            lines = [l for l in res.stdout.strip().split('\n') if l.strip()]
+            return len(lines)
+    except Exception:
+        pass
+
+    try:
+        # Fallback to torch if available in host
+        import torch
+        if torch.cuda.is_available():
+            return torch.cuda.device_count()
+    except (ImportError, Exception):
+        pass
+
+    return 0
+
+
 def setup_environment(base_dir, nanochat_dir, nproc):
     """Setup environment variables for training"""
     lab.log("🔧 Phase: Environment Setup")
@@ -390,8 +412,21 @@ def main():
             wandb_run = "dummy"  # Skip wandb logging
             lab.log("ℹ️  No WANDB_API_KEY found, training will run without wandb logging")
         
-        # Get GPU count
-        nproc = nproc_per_node
+        # Determine actual GPU count to avoid "invalid device ordinal" errors
+        detected_gpus = get_available_gpus()
+        if detected_gpus > 0:
+            if nproc_per_node > detected_gpus:
+                lab.log(f"⚠️  Requested {nproc_per_node} GPUs, but only {detected_gpus} detected. Capping to {detected_gpus}.")
+                nproc = detected_gpus
+            else:
+                nproc = nproc_per_node
+        elif nproc_per_node > 0:
+            # If no GPUs detected but requested > 0, we might be in an environment where detection fails
+            # but we'll try with 1 to see if it works, or just fallback to configured value if we're unsure
+            lab.log(f"⚠️  No GPUs detected via nvidia-smi or torch. Using {nproc_per_node} as configured.")
+            nproc = nproc_per_node
+        else:
+            nproc = 1
         
         # Deactivate conda if active (to avoid conflicts with uv venv)
         if os.environ.get("CONDA_PREFIX"):

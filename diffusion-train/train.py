@@ -324,7 +324,7 @@ def train_diffusion_lora():
     model_name = config.get("model_name", "CompVis/stable-diffusion-v1-4")
     dataset = config.get("dataset", "nkasmanoff/nasa_earth_instagram")
     learning_rate = config.get("learning_rate", 0.0001)
-    batch_size = config.get("batch_size", 1)
+    batch_size = config.get("train_batch_size", 1)
     num_train_epochs = config.get("num_train_epochs", 1)
     max_steps = config.get("max_steps", 10)
     adaptor_name = config.get("adaptor_name", "adaptor")

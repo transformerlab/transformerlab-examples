@@ -12,17 +12,9 @@
   "parameters": {
     "model_name": "CompVis/stable-diffusion-v1-4",
     "dataset": "nkasmanoff/nasa_earth_instagram",
-    "caption_column": "text",
-    "image_column": "image",
     "num_train_epochs": 1,
     "train_batch_size": 1,
-    "resolution": 256,
-    "lora_r": 4,
-    "lora_alpha": 8,
-    "learning_rate": 0.0001,
-    "mixed_precision": "fp16",
-    "eval_prompt": "a cute pokemon",
-    "eval_steps": 1
+    "learning_rate": 0.0001
   },
   "description": "A LoRA trainer for Stable Diffusion models (SD 1.x, SDXL, SD3, Flux). Trains on images with captions and generates sample images before and after training."
 }

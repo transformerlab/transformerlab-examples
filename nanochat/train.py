@@ -403,15 +403,15 @@ def main():
         else:
             lab.log("⏭️  RL training is DISABLED (set enable_rl=True in config to enable)")
         
-        # Initialize report
+        # Run all training phases
+        setup_environment(base_dir, nanochat_dir, nproc)
+        
+        # Initialize report (after environment setup)
         run_command(
             "uv run python -m nanochat.report reset",
             "Initializing report",
             cwd=nanochat_dir
         )
-        
-        # Run all training phases
-        setup_environment(base_dir, nanochat_dir, nproc)
         dataset_process = train_tokenizer(base_dir, nanochat_dir)
         train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run)
         train_midtraining(base_dir, nanochat_dir, nproc, wandb_run)

@@ -1,0 +1,15 @@
+name: nanochat-train-task
+resources:
+  accelerators: "H100:8"
+setup: "uv pip install transformerlab torch torchvision torchaudio transformers datasets wandb;sudo apt update;sudo apt install -y curl git build-essential;"
+run: "cd ~/nanochat && python train.py"
+envs:
+  WANDB_PROJECT: "nanochat-training"
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "<your_huggingface_token_here>"
+  WANDB_API_KEY: "<your_wandb_api_key_here>"
+parameters:
+  depth: "20"
+  nproc_per_node: "8"
+  enable_rl: "false"
+  log_to_wandb: "true"

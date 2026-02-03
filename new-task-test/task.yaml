@@ -1,0 +1,20 @@
+name: fake-task
+resources:
+  cpus: 2
+  memory: 4
+setup: "uv pip install transformerlab wandb"
+run: "python ~/new-task-test/train.py"
+envs:
+  WANDB_PROJECT: "my-training-project"
+  PYTHONUNBUFFERED: "1"
+  WANDB_API_KEY: "<your_wandb_api_key_here>"
+parameters:
+  model_name: "HuggingFaceTB/SmolLM-135M-Instruct"
+  dataset: "Trelis/touch-rugby-rules"
+  lr: "2e-5"
+  num_train_epochs: "1"
+  batch_size: "8"
+  gradient_accumulation_steps: "1"
+  warmup_ratio: "0.03"
+  weight_decay: "0.01"
+  max_seq_length: "512"

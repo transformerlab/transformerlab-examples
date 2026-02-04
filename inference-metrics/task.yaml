@@ -1,0 +1,8 @@
+name: inference-metrics-task
+resources:
+  accelerators: "RTX3090:1"
+envs:
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+setup: "uv pip install GPUtil transformers accelerate huggingface-hub transformerlab && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
+run: "cd ~/inference-metrics && python main.py"

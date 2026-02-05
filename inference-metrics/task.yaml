@@ -1,4 +1,6 @@
 name: inference-metrics-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: inference-metrics
 resources:
   accelerators: "RTX3090:1"
 envs:

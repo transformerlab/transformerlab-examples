@@ -1,5 +1,7 @@
 name: auto-caption-wd14
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: auto-caption-wd14 
 resources:
   accelerators: "RTX3090:1"
-setup: "uv pip install transformerlab torchvision huggingface-hub"
+setup: "uv pip install transformerlab transformers datasets torchvision huggingface-hub"
 run: "cd ~/auto-caption-wd14 && python main.py"

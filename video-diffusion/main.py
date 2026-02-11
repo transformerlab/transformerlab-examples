@@ -9,7 +9,7 @@ import ftfy
 from lab import lab
 
 # Login to HuggingFace if token is provided
-from huggingface_hub import login
+from huggingface_hub import login, snapshot_download
 if os.getenv("HF_TOKEN"):
     login(token=os.getenv("HF_TOKEN"))
 
@@ -20,7 +20,7 @@ def main():
         config = lab.get_config()
 
         # Extract parameters with defaults
-        model_id = config.get("model_id", "Wan-AI/Wan2.1-T2V-14B-Diffusers")
+        model_id = config.get("model_id", "samuelchristlie/Wan2.1-T2V-1.3B-GGUF")
         prompt = config.get("prompt", "A cat walks on the grass, realistic")
         negative_prompt = config.get("negative_prompt", "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, still picture, messy background, three legs, many people in the background, walking backwards")
         height = int(config.get("height", 480))
@@ -44,9 +44,34 @@ def main():
         # Load VAE and pipeline
         lab.update_progress(10)
         lab.log("Loading VAE and pipeline...")
-        vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
-        pipe = WanPipeline.from_pretrained(model_id, vae=vae, torch_dtype=torch.bfloat16)
-        pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+        try:
+            vae = AutoencoderKLWan.from_pretrained(model_id, subfolder="vae", torch_dtype=torch.float32)
+            pipe = WanPipeline.from_pretrained(model_id, vae=vae, torch_dtype=torch.bfloat16)
+            pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+        except Exception as e:
+            err = str(e)
+            if "config.json" in err or "does not appear to have a file named config.json" in err:
+                lab.log("⚠️  config.json missing — downloading model repo to local cache...")
+                local_repo = snapshot_download(repo_id=model_id, repo_type="model")
+                lab.log(f"✅ Model repo downloaded to: {local_repo}")
+
+                # Try loading from the downloaded local repo (allow remote code if present)
+                try:
+                    vae = AutoencoderKLWan.from_pretrained(local_repo, subfolder="vae", torch_dtype=torch.float32, trust_remote_code=True)
+                    pipe = WanPipeline.from_pretrained(local_repo, vae=vae, torch_dtype=torch.bfloat16, trust_remote_code=True)
+                    pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+                except Exception as e2:
+                    lab.log(f"⚠️  Failed to instantiate pipeline from local repo: {e2}")
+                    # Zip the downloaded repo and save as a model artifact so the files are available
+                    import shutil
+                    safe_name = model_id.replace("/", "_")
+                    archive_base = os.path.join(output_dir, safe_name)
+                    archive_path = shutil.make_archive(archive_base, "zip", local_repo)
+                    artifact_path = lab.save_artifact(archive_path, os.path.basename(archive_path), type="model")
+                    lab.log(f"✅ Downloaded model repo saved as artifact: {artifact_path}")
+                    return {"status": "success", "downloaded_repo": local_repo, "artifact_path": artifact_path}
+            else:
+                raise
 
         # Generate video
         lab.update_progress(50)

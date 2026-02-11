@@ -314,11 +314,26 @@ def generate_sample_images(pipeline, prompt, num_images, output_dir, prefix, arg
 def train_diffusion_lora():
     """Main training function for Stable Diffusion LoRA"""
     
+
+
+    lab.init()
+
+    config = lab.get_config()
+
+    # Extract parameters with defaults
+    model_name = config.get("model_name", "CompVis/stable-diffusion-v1-4")
+    dataset = config.get("dataset", "nkasmanoff/nasa_earth_instagram")
+    learning_rate = config.get("learning_rate", 0.0001)
+    batch_size = config.get("train_batch_size", 1)
+    num_train_epochs = config.get("num_train_epochs", 1)
+    max_steps = config.get("max_steps", 10)
+    adaptor_name = config.get("adaptor_name", "adaptor")
+
     # Training configuration with defaults
     training_config = {
         "experiment_name": "stable-diffusion-lora-training",
-        "model_name": "CompVis/stable-diffusion-v1-4",
-        "dataset": "nkasmanoff/nasa_earth_instagram",
+        "model_name": model_name,
+        "dataset": dataset,
         "output_dir": "./output",
         "log_to_wandb": False,
         "_config": {
@@ -334,8 +349,8 @@ def train_diffusion_lora():
             "trigger_word": "",
             
             # Training settings - reduced for small dataset
-            "num_train_epochs": 1,  # Few epochs for quick testing
-            "train_batch_size": 1,
+            "num_train_epochs": num_train_epochs,  # Few epochs for quick testing
+            "train_batch_size": batch_size,
             "gradient_accumulation_steps": 1,
             "resolution": 256,  # Smaller resolution for faster training
             "dataloader_num_workers": 0,
@@ -358,7 +373,7 @@ def train_diffusion_lora():
             "lora_alpha": 8,
             
             # Optimizer settings
-            "learning_rate": 0.0001,
+            "learning_rate": learning_rate,
             "lr_scheduler": "constant",
             "lr_warmup_steps": 0,  # No warmup for small dataset
             "adam_beta1": 0.9,
@@ -387,14 +402,13 @@ def train_diffusion_lora():
             "eval_guidance_scale": 7.5,
             
             # Output settings
-            "adaptor_name": "adaptor",
+            "adaptor_name": adaptor_name,
             "adaptor_output_dir": "./output/lora",
         }
     }
     
     try:
         # Initialize lab
-        lab.init()
         lab.set_config(training_config)
         
         # Log start time

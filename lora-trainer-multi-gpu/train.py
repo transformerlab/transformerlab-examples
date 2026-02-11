@@ -24,6 +24,12 @@ from huggingface_hub import login
 if os.getenv("HF_TOKEN"):
     login(token=os.getenv("HF_TOKEN"))
 
+# Login to wandb if API key is provided
+if os.getenv("WANDB_API_KEY"):
+    import wandb
+    wandb.login(key=os.getenv("WANDB_API_KEY"))
+    lab.log("✅ Wandb login succeeded")
+
 
 def find_lora_target_modules(model, keyword="proj"):
     """
@@ -281,7 +287,6 @@ def train_with_lora():
                 args=training_args,
                 train_dataset=dataset["train"],
                 processing_class=tokenizer,
-                peft_config=peft_config,
                 callbacks=[transformerlab_callback],
             )
 

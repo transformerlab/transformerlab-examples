@@ -1,9 +1,0 @@
-{
-  "title": "Dataset Generate Task",
-  "name": "sample-generate-task",
-  "command": "python ~/demo-generate-task/fake_generate.py",
-  "cpus": "2",
-  "memory": "4",
-  "setup": "uv pip install transformerlab datasets;",
-  "description": "A fake task to show generation capabilities"
-}

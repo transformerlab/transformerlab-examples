@@ -14,29 +14,41 @@ jinja_environment = Environment()
 def train_model():
     """Main training function for AutoTrain SFT"""
 
-    # Training configuration
-    training_config = {
-        "experiment_name": "autotrain-sft-training",
-        "model_name": "microsoft/DialoGPT-small",
-        "dataset": "HuggingFaceH4/no_robots",
-        "template_name": "autotrain-sft-demo",
-        "output_dir": "./output",
-        "log_to_wandb": False,
-        "_config": {
-            "learning_rate": 0.0002,
-            "batch_size": 4,
-            "num_train_epochs": 1,
-            "adaptor_name": "adaptor",
-            "formatting_template": "{% for message in messages %}{{ message.role | title }}: {{ message.content }}\n{% endfor %}",
-            "dataset_name": "HuggingFaceH4/no_robots",
-            "max_steps": 10,
-        },
-    }
-
     try:
         # Initialize lab
         lab.init()
-        lab.set_config(training_config)
+
+        # Get parameters from task configuration
+        config = lab.get_config()
+
+        # Extract parameters with defaults
+        model_name = config.get("model_name", "microsoft/DialoGPT-small")
+        dataset = config.get("dataset", "HuggingFaceH4/no_robots")
+        learning_rate = config.get("learning_rate", 0.0002)
+        batch_size = config.get("batch_size", 4)
+        num_train_epochs = config.get("num_train_epochs", 1)
+        max_steps = config.get("max_steps", 10)
+        adaptor_name = config.get("adaptor_name", "adaptor")
+        formatting_template_str = config.get("formatting_template", "{% for message in messages %}{{ message.role | title }}: {{ message.content }}\n{% endfor %}")
+
+        # Training configuration
+        training_config = {
+            "experiment_name": "autotrain-sft-training",
+            "model_name": model_name,
+            "dataset": dataset,
+            "template_name": "autotrain-sft-demo",
+            "output_dir": "./output",
+            "log_to_wandb": False,
+            "_config": {
+                "learning_rate": learning_rate,
+                "batch_size": batch_size,
+                "num_train_epochs": num_train_epochs,
+                "adaptor_name": adaptor_name,
+                "formatting_template": formatting_template_str,
+                "dataset_name": dataset,
+                "max_steps": max_steps,
+            },
+        }
 
         checkpoint = lab.get_checkpoint_to_resume()
         if checkpoint:
@@ -65,7 +77,7 @@ def train_model():
             os.makedirs(data_directory)
 
         # Get template from config
-        formatting_template = jinja_environment.from_string(config["formatting_template"])
+        formatting_template = jinja_environment.from_string(formatting_template_str)
 
         # Load datasets (train, test) - using datasets library directly
         lab.log("Loading dataset...")

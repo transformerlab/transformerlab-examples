@@ -64,6 +64,28 @@ def run_command(command, description, stream_output=True, cwd=None, env=None):
         raise
 
 
+def get_available_gpus():
+    """Detect the number of available GPUs using nvidia-smi or torch"""
+    try:
+        # Try nvidia-smi first (fast and doesn't require torch in the host env)
+        res = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, timeout=5)
+        if res.returncode == 0:
+            lines = [l for l in res.stdout.strip().split('\n') if l.strip()]
+            return len(lines)
+    except Exception:
+        pass
+
+    try:
+        # Fallback to torch if available in host
+        import torch
+        if torch.cuda.is_available():
+            return torch.cuda.device_count()
+    except (ImportError, Exception):
+        pass
+
+    return 0
+
+
 def setup_environment(base_dir, nanochat_dir, nproc):
     """Setup environment variables for training"""
     lab.log("🔧 Phase: Environment Setup")
@@ -335,8 +357,12 @@ def main():
         config = lab.get_config()
         
         # Extract parameters with defaults
-        depth = config.get("depth", 20)
-        nproc_per_node = config.get("nproc_per_node", 1)
+        try:
+            depth = int(config.get("depth", 20))
+            nproc_per_node = int(config.get("nproc_per_node", 1))
+        except (ValueError, TypeError):
+            depth = 20
+            nproc_per_node = 1
         enable_rl = config.get("enable_rl", False)
         log_to_wandb = config.get("log_to_wandb", False)
         
@@ -360,17 +386,27 @@ def main():
         
         lab.log(f"Training data directory: {base_dir}")
         
-        # Clone nanochat repository if not exists
-        nanochat_dir = os.path.expanduser("~/nanochat")
-        if not os.path.exists(nanochat_dir):
-            lab.log("📥 Cloning nanochat repository...")
+        # Clone nanochat repository if not exists or if it's not a valid repo
+        # We use ~/nanochat-repo to avoid collision with potential workspace folders named 'nanochat'
+        nanochat_dir = os.path.abspath(os.path.expanduser("~/nanochat-repo"))
+        
+        if not os.path.exists(nanochat_dir) or not os.path.exists(os.path.join(nanochat_dir, "pyproject.toml")):
+            if os.path.exists(nanochat_dir):
+                lab.log(f"⚠️  {nanochat_dir} exists but is missing pyproject.toml. Re-cloning...")
+                import shutil
+                try:
+                    shutil.rmtree(nanochat_dir)
+                except Exception:
+                    pass
+            
+            lab.log(f"📥 Cloning nanochat repository to {nanochat_dir}...")
             run_command(
-                "git clone https://github.com/karpathy/nanochat.git ~/nanochat",
+                f"git clone https://github.com/karpathy/nanochat.git {nanochat_dir}",
                 "Cloning nanochat repository",
                 stream_output=True
             )
         else:
-            lab.log(f"✅ Nanochat directory found: {nanochat_dir}")
+            lab.log(f"✅ Nanochat repository found: {nanochat_dir}")
         
         # Setup WANDB run name
         wandb_run = f"nanochat-speedrun"
@@ -380,8 +416,21 @@ def main():
             wandb_run = "dummy"  # Skip wandb logging
             lab.log("ℹ️  No WANDB_API_KEY found, training will run without wandb logging")
         
-        # Get GPU count
-        nproc = nproc_per_node
+        # Determine actual GPU count to avoid "invalid device ordinal" errors
+        detected_gpus = get_available_gpus()
+        if detected_gpus > 0:
+            if nproc_per_node > detected_gpus:
+                lab.log(f"⚠️  Requested {nproc_per_node} GPUs, but only {detected_gpus} detected. Capping to {detected_gpus}.")
+                nproc = detected_gpus
+            else:
+                nproc = nproc_per_node
+        elif nproc_per_node > 0:
+            # If no GPUs detected but requested > 0, we might be in an environment where detection fails
+            # but we'll try with 1 to see if it works, or just fallback to configured value if we're unsure
+            lab.log(f"⚠️  No GPUs detected via nvidia-smi or torch. Using {nproc_per_node} as configured.")
+            nproc = nproc_per_node
+        else:
+            nproc = 1
         
         # Deactivate conda if active (to avoid conflicts with uv venv)
         if os.environ.get("CONDA_PREFIX"):
@@ -403,15 +452,15 @@ def main():
         else:
             lab.log("⏭️  RL training is DISABLED (set enable_rl=True in config to enable)")
         
-        # Initialize report
+        # Run all training phases
+        setup_environment(base_dir, nanochat_dir, nproc)
+        
+        # Initialize report (after environment setup)
         run_command(
             "uv run python -m nanochat.report reset",
             "Initializing report",
             cwd=nanochat_dir
         )
-        
-        # Run all training phases
-        setup_environment(base_dir, nanochat_dir, nproc)
         dataset_process = train_tokenizer(base_dir, nanochat_dir)
         train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run)
         train_midtraining(base_dir, nanochat_dir, nproc, wandb_run)

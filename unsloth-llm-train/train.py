@@ -123,36 +123,58 @@ def train_with_unsloth():
     # Configure GPU usage - use only GPU 0
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    # Training configuration
-    training_config = {
-        "experiment_name": "unsloth-lora-training",
-        "model_name": "unsloth/Qwen2.5-0.5B-Instruct",  # Small model for testing
-        "dataset": "Trelis/touch-rugby-rules",  # Example dataset
-        "template_name": "unsloth-demo",
-        "output_dir": "./output",
-        "log_to_wandb": False,
-        "_config": {
-            "dataset_name": "Trelis/touch-rugby-rules",
-            "lr": 2e-4,
-            "num_train_epochs": 1,
-            "batch_size": 2,
-            "gradient_accumulation_steps": 4,
-            "warmup_steps": 5,
-            "max_steps": 10,
-            "max_seq_length": 2048,
-            "lora_r": 16,
-            "lora_alpha": 16,
-            "lora_dropout": 0.05,
-            "logging_steps": 1,
-            "save_steps": 50,
-            "weight_decay": 0.01,
-            "dataloader_num_workers": 0,  # Avoid multiprocessing issues
-        },
-    }
-
     try:
-        # Initialize lab with default/simple API
+        # Initialize lab
         lab.init()
+
+        # Get parameters from task configuration
+        config = lab.get_config()
+
+        # Extract parameters with defaults
+        model_name = config.get("model_name", "unsloth/Qwen2.5-0.5B-Instruct")
+        dataset_name = config.get("dataset", "Trelis/touch-rugby-rules")
+        lr = config.get("lr", 2e-4)
+        num_train_epochs = config.get("num_train_epochs", 1)
+        batch_size = config.get("batch_size", 2)
+        gradient_accumulation_steps = config.get("gradient_accumulation_steps", 4)
+        warmup_steps = config.get("warmup_steps", 5)
+        max_steps = config.get("max_steps", 10)
+        max_seq_length = config.get("max_seq_length", 2048)
+        lora_r = config.get("lora_r", 16)
+        lora_alpha = config.get("lora_alpha", 16)
+        lora_dropout = config.get("lora_dropout", 0.05)
+        logging_steps = config.get("logging_steps", 1)
+        save_steps = config.get("save_steps", 50)
+        weight_decay = config.get("weight_decay", 0.01)
+        dataloader_num_workers = config.get("dataloader_num_workers", 0)
+
+        # Training configuration
+        training_config = {
+            "experiment_name": "unsloth-lora-training",
+            "model_name": model_name,
+            "dataset": dataset_name,
+            "template_name": "unsloth-demo",
+            "output_dir": "./output",
+            "log_to_wandb": False,
+            "_config": {
+                "dataset_name": dataset_name,
+                "lr": lr,
+                "num_train_epochs": num_train_epochs,
+                "batch_size": batch_size,
+                "gradient_accumulation_steps": gradient_accumulation_steps,
+                "warmup_steps": warmup_steps,
+                "max_steps": max_steps,
+                "max_seq_length": max_seq_length,
+                "lora_r": lora_r,
+                "lora_alpha": lora_alpha,
+                "lora_dropout": lora_dropout,
+                "logging_steps": logging_steps,
+                "save_steps": save_steps,
+                "weight_decay": weight_decay,
+                "dataloader_num_workers": dataloader_num_workers,
+            },
+        }
+
         lab.set_config(training_config)
 
         # Check if we should resume from a checkpoint

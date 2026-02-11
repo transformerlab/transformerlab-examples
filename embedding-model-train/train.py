@@ -155,7 +155,7 @@ def train_embedding_model():
         model_name = config.get("model_name", "sentence-transformers/all-MiniLM-L6-v2")
         dataset_name = config.get("dataset_name", "sentence-transformers/stsb")
         output_dir = config.get("output_dir", "./output")
-        log_to_wandb = config.get("log_to_wandb", True)
+        log_to_wandb = config.get("log_to_wandb", False)
 
         # Dataset and loss configuration
         dataset_type = config.get("dataset_type", "anchor | positive")

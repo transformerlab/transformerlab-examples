@@ -158,50 +158,84 @@ def train_model():
     # Configure GPU usage - use only GPU 0
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    # Training configuration
-    training_config = {
-        "experiment_name": "unsloth-grpo-training",
-        "model_name": "unsloth/SmolLM2-135M",  # Tiny model for fast testing
-        "dataset": "openai/gsm8k",  # Example dataset for reasoning
-        "template_name": "unsloth-grpo-demo",
-        "output_dir": "./output",
-        "log_to_wandb": False,
-        "_config": {
-            "dataset_name": "openai/gsm8k",
-            "dataset_config": "main",
-            "dataset_split": "train",
-            "dataset_input_field": "question",
-            "dataset_output_field": "answer",
-            "start_thinking_string": "<reasoning>",
-            "end_thinking_string": "</reasoning>",
-            "start_answer_string": "<answer>",
-            "end_answer_string": "</answer>",
-            "lora_alpha": 32,
-            "lora_dropout": 0.05,
-            "lora_r": 16,
-            "maximum_sequence_length": 1024,
-            "maximum_completion_length": 512,
-            "max_grad_norm": 0.3,
-            "learning_rate": 5e-05,
-            "learning_rate_schedule": "constant",
-            "batch_size": 1,
-            "num_train_epochs": 1,
-            "weight_decay": 0.0,
-            "adam_beta1": 0.9,
-            "adam_beta2": 0.999,
-            "adam_epsilon": 1e-08,
-            "max_steps": 5,  # ultra-quick testing
-            "device": "cuda" if torch.cuda.is_available() else "cpu",
-            # Template configuration
-            "system_prompt": "You are a helpful assistant that solves math problems step by step.",
-            "input_template": "{{ question }}",
-            "output_template": "{{ answer }}",
-        },
-    }
-
     try:
-        # Initialize lab with default/simple API
+        # Initialize lab
         lab.init()
+
+        # Get parameters from task configuration
+        config = lab.get_config()
+
+        # Extract parameters with defaults
+        model_name = config.get("model_name", "unsloth/SmolLM2-135M")
+        dataset = config.get("dataset", "openai/gsm8k")
+        dataset_config = config.get("dataset_config", "main")
+        dataset_split = config.get("dataset_split", "train")
+        dataset_input_field = config.get("dataset_input_field", "question")
+        dataset_output_field = config.get("dataset_output_field", "answer")
+        start_thinking_string = config.get("start_thinking_string", "<reasoning>")
+        end_thinking_string = config.get("end_thinking_string", "</reasoning>")
+        start_answer_string = config.get("start_answer_string", "<answer>")
+        end_answer_string = config.get("end_answer_string", "</answer>")
+        lora_alpha = config.get("lora_alpha", 32)
+        lora_dropout = config.get("lora_dropout", 0.05)
+        lora_r = config.get("lora_r", 16)
+        maximum_sequence_length = config.get("maximum_sequence_length", 1024)
+        maximum_completion_length = config.get("maximum_completion_length", 512)
+        max_grad_norm = config.get("max_grad_norm", 0.3)
+        learning_rate = config.get("learning_rate", 5e-05)
+        learning_rate_schedule = config.get("learning_rate_schedule", "constant")
+        batch_size = config.get("batch_size", 1)
+        num_train_epochs = config.get("num_train_epochs", 1)
+        weight_decay = config.get("weight_decay", 0.0)
+        adam_beta1 = config.get("adam_beta1", 0.9)
+        adam_beta2 = config.get("adam_beta2", 0.999)
+        adam_epsilon = config.get("adam_epsilon", 1e-08)
+        max_steps = config.get("max_steps", 5)
+        system_prompt = config.get("system_prompt", "You are a helpful assistant that solves math problems step by step.")
+        input_template = config.get("input_template", "{{ question }}")
+        output_template = config.get("output_template", "{{ answer }}")
+
+        # Training configuration
+        training_config = {
+            "experiment_name": "unsloth-grpo-training",
+            "model_name": model_name,
+            "dataset": dataset,
+            "template_name": "unsloth-grpo-demo",
+            "output_dir": "./output",
+            "log_to_wandb": False,
+            "_config": {
+                "dataset_name": dataset,
+                "dataset_config": dataset_config,
+                "dataset_split": dataset_split,
+                "dataset_input_field": dataset_input_field,
+                "dataset_output_field": dataset_output_field,
+                "start_thinking_string": start_thinking_string,
+                "end_thinking_string": end_thinking_string,
+                "start_answer_string": start_answer_string,
+                "end_answer_string": end_answer_string,
+                "lora_alpha": lora_alpha,
+                "lora_dropout": lora_dropout,
+                "lora_r": lora_r,
+                "maximum_sequence_length": maximum_sequence_length,
+                "maximum_completion_length": maximum_completion_length,
+                "max_grad_norm": max_grad_norm,
+                "learning_rate": learning_rate,
+                "learning_rate_schedule": learning_rate_schedule,
+                "batch_size": batch_size,
+                "num_train_epochs": num_train_epochs,
+                "weight_decay": weight_decay,
+                "adam_beta1": adam_beta1,
+                "adam_beta2": adam_beta2,
+                "adam_epsilon": adam_epsilon,
+                "max_steps": max_steps,
+                "device": "cuda" if torch.cuda.is_available() else "cpu",
+                # Template configuration
+                "system_prompt": system_prompt,
+                "input_template": input_template,
+                "output_template": output_template,
+            },
+        }
+
         lab.set_config(training_config)
 
         checkpoint = lab.get_checkpoint_to_resume()

@@ -52,7 +52,7 @@ parameters:
     max: 1822
     step: 10
     title: Total Dataset Shards
-    description: Total dataset shards to download in background for pretraining. ~350 shards needed for 10B tokens. Max available: 1822.
+    description: "Total dataset shards to download in background for pretraining. ~350 shards needed for 10B tokens. Max available: 1822."
   
   tokenizer_max_chars:
     type: int

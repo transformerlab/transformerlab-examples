@@ -14,16 +14,15 @@ from lab import lab
 
 
 def run_command(command, description, stream_output=True, cwd=None, env=None):
-    """Execute a command and log the output"""
+    """Execute a command and log the output."""
     lab.log(f"🔧 {description}")
     try:
         # Merge environment variables
         cmd_env = os.environ.copy()
         if env:
             cmd_env.update(env)
-        
+
         if stream_output:
-            # Stream output in real-time for long-running commands
             process = subprocess.Popen(
                 command,
                 shell=True,
@@ -32,14 +31,12 @@ def run_command(command, description, stream_output=True, cwd=None, env=None):
                 text=True,
                 bufsize=1,
                 cwd=cwd,
-                env=cmd_env
+                env=cmd_env,
             )
-            
-            for line in iter(process.stdout.readline, ''):
+            for line in iter(process.stdout.readline, ""):
                 if line:
-                    print(line.rstrip())  # Print to stdout
+                    print(line.rstrip())
                     lab.log(line.rstrip())
-            
             process.wait()
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, command)
@@ -51,345 +48,422 @@ def run_command(command, description, stream_output=True, cwd=None, env=None):
                 capture_output=True,
                 text=True,
                 cwd=cwd,
-                env=cmd_env
+                env=cmd_env,
             )
             if result.stdout:
                 lab.log(result.stdout)
-        
+
         return True
     except subprocess.CalledProcessError as e:
         lab.log(f"❌ Error running command: {command}")
-        if hasattr(e, 'stderr') and e.stderr:
+        if hasattr(e, "stderr") and e.stderr:
             lab.log(f"Error output: {e.stderr}")
         raise
 
 
 def get_available_gpus():
-    """Detect the number of available GPUs using nvidia-smi or torch"""
+    """Detect the number of available GPUs using nvidia-smi or torch."""
     try:
-        # Try nvidia-smi first (fast and doesn't require torch in the host env)
         res = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, timeout=5)
         if res.returncode == 0:
-            lines = [l for l in res.stdout.strip().split('\n') if l.strip()]
+            lines = [l for l in res.stdout.strip().split("\n") if l.strip()]
             return len(lines)
     except Exception:
         pass
-
     try:
-        # Fallback to torch if available in host
         import torch
         if torch.cuda.is_available():
             return torch.cuda.device_count()
     except (ImportError, Exception):
         pass
-
     return 0
 
 
+def _bool(val):
+    """Normalise a config value that may be a string to a Python bool."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() in ("true", "1", "yes")
+    return bool(val)
+
+
+def _int(val, default):
+    """Safely cast a config value to int, falling back to *default*."""
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return default
+
+
+def _float(val, default):
+    """Safely cast a config value to float, falling back to *default*."""
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return default
+
+
+# ---------------------------------------------------------------------------
+# Training phases
+# ---------------------------------------------------------------------------
+
 def setup_environment(base_dir, nanochat_dir, nproc):
-    """Setup environment variables for training"""
+    """Setup environment variables and install dependencies."""
     lab.log("🔧 Phase: Environment Setup")
-    
-    # Set environment variables
+
     os.environ["NANOCHAT_BASE_DIR"] = base_dir
     os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["NPROC_PER_NODE"] = str(nproc)
-    
+
     lab.log(f"NANOCHAT_BASE_DIR: {base_dir}")
     lab.log(f"Using {nproc} GPU(s)")
-    
+
     # Install uv if not available
     if subprocess.run("command -v uv", shell=True, capture_output=True).returncode != 0:
         lab.log("📦 Installing uv package manager...")
-        run_command(
-            "curl -LsSf https://astral.sh/uv/install.sh | sh",
-            "Installing uv",
-            stream_output=False
-        )
-    
+        run_command("curl -LsSf https://astral.sh/uv/install.sh | sh", "Installing uv", stream_output=False)
+
     # Create venv and install dependencies
     lab.log("🔧 Creating virtual environment...")
     if not os.path.exists(os.path.join(nanochat_dir, ".venv")):
         run_command("uv venv", "Creating venv", cwd=nanochat_dir)
-    
+
     lab.log("📦 Installing dependencies...")
     run_command("uv sync --extra gpu", "Installing dependencies", cwd=nanochat_dir)
-    
+
     # Install transformerlab-sdk in the venv
     lab.log("📦 Installing transformerlab-sdk...")
     run_command("uv pip install transformerlab", "Installing SDK", cwd=nanochat_dir)
-    
 
-def train_tokenizer(base_dir, nanochat_dir):
-    """Train the tokenizer"""
+
+def train_tokenizer(nanochat_dir, initial_shards, total_shards, max_chars, vocab_size):
+    """Train the BPE tokenizer and kick off background dataset download."""
     lab.log("🔧 Phase: Tokenizer Training")
-    
-    # Download initial dataset (reduced for testing)
-    lab.log("📥 Downloading initial dataset shards (2 - test mode)...")
+
+    # Download initial dataset shards
+    lab.log(f"📥 Downloading initial dataset shards ({initial_shards})...")
     run_command(
-        "uv run python -m nanochat.dataset -n 2",
+        f"uv run python -m nanochat.dataset -n {initial_shards}",
         "Downloading dataset shards",
-        cwd=nanochat_dir
+        cwd=nanochat_dir,
     )
-    
-    # Start downloading additional shards in background (reduced for testing)
-    lab.log("📥 Starting background download of additional shards (10 - test mode)...")
+
+    # Start downloading remaining shards in background
+    lab.log(f"📥 Starting background download of additional shards ({total_shards} total)...")
     dataset_process = subprocess.Popen(
-        "uv run python -m nanochat.dataset -n 10",
+        f"uv run python -m nanochat.dataset -n {total_shards}",
         shell=True,
         cwd=nanochat_dir,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.DEVNULL,
     )
-    
-    
-    # Train tokenizer (reduced data for testing)
-    lab.log("🎯 Training tokenizer (test mode: 5M chars)...")
-    run_command(
-        "uv run python -m scripts.tok_train --max-chars=5000000",
-        "Training tokenizer",
-        cwd=nanochat_dir
-    )
-    
+
+    # Train tokenizer
+    lab.log(f"🎯 Training tokenizer (max_chars={max_chars:,}, vocab_size={vocab_size})...")
+    tok_cmd = f"uv run python -m scripts.tok_train --max-chars={max_chars} --vocab-size={vocab_size}"
+    run_command(tok_cmd, "Training tokenizer", cwd=nanochat_dir)
+
     # Evaluate tokenizer
     lab.log("📊 Evaluating tokenizer...")
-    run_command(
-        "uv run python -m scripts.tok_eval",
-        "Evaluating tokenizer",
-        cwd=nanochat_dir
-    )
-    
+    run_command("uv run python -m scripts.tok_eval", "Evaluating tokenizer", cwd=nanochat_dir)
+
     # Save tokenizer checkpoint
-    tokenizer_path = os.path.join(base_dir, "tokenizer.tok")
-    if os.path.exists(tokenizer_path):
-        lab.save_checkpoint(tokenizer_path, "tokenizer.tok")
+    base_dir = os.environ["NANOCHAT_BASE_DIR"]
+    tokenizer_dir = os.path.join(base_dir, "tokenizer")
+    if os.path.exists(tokenizer_dir):
+        lab.save_checkpoint(tokenizer_dir, "tokenizer")
         lab.log("✅ Tokenizer checkpoint saved")
-    
+
     return dataset_process
 
 
-def train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run):
-    """Train the base model"""
+def train_base_model(nanochat_dir, dataset_process, nproc, cfg):
+    """Pretrain the base model."""
     lab.log("🔧 Phase: Base Model Pretraining")
-    
+
     # Wait for dataset download
     lab.log("⏳ Waiting for dataset download to complete...")
     dataset_process.wait()
     lab.log("✅ Dataset download complete")
-        
-    # Train base model (reduced for testing)
-    lab.log("🎯 Training base d12 model (test mode: reduced depth and iterations)...")
-    nproc_env = {"NPROC_PER_NODE": str(nproc)}
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train -- --depth=12 --num-iterations=50 --run={wandb_run}",
-        "Training base model",
-        cwd=nanochat_dir,
-        env=nproc_env
-    )
-        
-    # Save base model checkpoint
-    model_path = os.path.join(base_dir, "checkpoints", "model_d12_test.pt")
-    if os.path.exists(model_path):
-        lab.save_checkpoint(model_path, "base_model_d12_test.pt")
-        lab.log("✅ Base model checkpoint saved")
-    
-    # Evaluate on train/val
-    lab.log("📊 Evaluating base model on train/val data...")
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_loss",
-        "Evaluating base model",
-        cwd=nanochat_dir
-    )
-        
-    # Evaluate on CORE tasks
-    lab.log("📊 Evaluating base model on CORE tasks...")
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_eval",
-        "Evaluating on CORE tasks",
-        cwd=nanochat_dir
-    )
-    
 
-def train_midtraining(base_dir, nanochat_dir, nproc, wandb_run):
-    """Run midtraining phase"""
-    lab.log("🔧 Phase: Midtraining")
-    
-    # Download identity conversations
-    lab.log("📥 Downloading identity conversations...")
+    depth = cfg["depth"]
+    wandb_run = cfg["wandb_run"]
+
+    # Build base_train command with all configurable flags
+    cmd_parts = [
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_train --",
+        f"--depth={depth}",
+        f"--device-batch-size={cfg['device_batch_size']}",
+        f"--run={wandb_run}",
+    ]
+
+    # Optional flags
+    if cfg["target_param_data_ratio"] > 0:
+        cmd_parts.append(f"--target-param-data-ratio={cfg['target_param_data_ratio']}")
+    if cfg["total_batch_size"] > 0:
+        cmd_parts.append(f"--total-batch-size={cfg['total_batch_size']}")
+    if cfg["num_iterations"] > 0:
+        cmd_parts.append(f"--num-iterations={cfg['num_iterations']}")
+    if cfg["max_seq_len"] != 2048:
+        cmd_parts.append(f"--max-seq-len={cfg['max_seq_len']}")
+    if cfg["window_pattern"] != "SSSL":
+        cmd_parts.append(f"--window-pattern={cfg['window_pattern']}")
+    if cfg["aspect_ratio"] != 64:
+        cmd_parts.append(f"--aspect-ratio={cfg['aspect_ratio']}")
+    if cfg["warmdown_ratio"] != 0.5:
+        cmd_parts.append(f"--warmdown-ratio={cfg['warmdown_ratio']}")
+    if cfg["weight_decay"] != 0.2:
+        cmd_parts.append(f"--weight-decay={cfg['weight_decay']}")
+    if cfg["eval_every"] != 250:
+        cmd_parts.append(f"--eval-every={cfg['eval_every']}")
+    if cfg["core_metric_every"] != 2000:
+        cmd_parts.append(f"--core-metric-every={cfg['core_metric_every']}")
+    if cfg["save_every"] != -1:
+        cmd_parts.append(f"--save-every={cfg['save_every']}")
+    if cfg["sample_every"] != 2000:
+        cmd_parts.append(f"--sample-every={cfg['sample_every']}")
+    if cfg["model_tag"]:
+        cmd_parts.append(f"--model-tag={cfg['model_tag']}")
+    if cfg["enable_fp8"]:
+        cmd_parts.append("--fp8")
+
+    base_train_cmd = " ".join(cmd_parts)
+    lab.log(f"🎯 Training base d{depth} model...")
+    lab.log(f"Command: {base_train_cmd}")
+    run_command(base_train_cmd, "Training base model", cwd=nanochat_dir)
+
+    # Evaluate base model: CORE metric, BPB on train/val, samples
+    lab.log("📊 Evaluating base model (CORE, BPB, samples)...")
+    eval_cmd = f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.base_eval -- --device-batch-size={cfg['device_batch_size']}"
+    run_command(eval_cmd, "Evaluating base model", cwd=nanochat_dir)
+
+
+def train_sft(nanochat_dir, nproc, cfg):
+    """Run supervised finetuning (SFT)."""
+    lab.log("🔧 Phase: Supervised Finetuning (SFT)")
+
+    wandb_run = cfg["wandb_run"]
+
+    # Download identity conversations for personality
+    base_dir = os.environ["NANOCHAT_BASE_DIR"]
     identity_file = os.path.join(base_dir, "identity_conversations.jsonl")
+    lab.log("📥 Downloading identity conversations...")
     run_command(
         f"curl -L -o {identity_file} https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl",
-        "Downloading conversations",
-        stream_output=False
+        "Downloading identity conversations",
+        stream_output=False,
     )
-        
-    # Run midtraining
-    lab.log("🎯 Running midtraining...")
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.mid_train -- --run={wandb_run}",
-        "Midtraining",
-        cwd=nanochat_dir
-    )
-        
-    # Save midtraining checkpoint
-    model_path = os.path.join(base_dir, "checkpoints", "model_mid.pt")
-    if os.path.exists(model_path):
-        lab.save_checkpoint(model_path, "mid_model.pt")
-        lab.log("✅ Midtraining checkpoint saved")
-    
-    # Evaluate
-    lab.log("📊 Evaluating midtrained model...")
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_eval -i mid",
-        "Evaluating midtrained model",
-        cwd=nanochat_dir
-    )
-    
 
-def train_sft(base_dir, nanochat_dir, nproc, wandb_run):
-    """Run supervised finetuning"""
-    lab.log("🔧 Phase: Supervised Finetuning")
-    
-    # Run SFT
-    lab.log("🎯 Running supervised finetuning...")
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_sft -- --run={wandb_run}",
-        "Supervised finetuning",
-        cwd=nanochat_dir
-    )
-        
-    # Save SFT checkpoint
-    model_path = os.path.join(base_dir, "checkpoints", "model_sft.pt")
-    if os.path.exists(model_path):
-        lab.save_checkpoint(model_path, "sft_model.pt")
-        lab.log("✅ SFT checkpoint saved")
-    
-    # Evaluate
+    # Build SFT command
+    cmd_parts = [
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_sft --",
+        f"--device-batch-size={cfg['sft_device_batch_size']}",
+        f"--run={wandb_run}",
+    ]
+    if cfg["sft_num_iterations"] > 0:
+        cmd_parts.append(f"--num-iterations={cfg['sft_num_iterations']}")
+    if cfg["sft_mmlu_epochs"] != 3:
+        cmd_parts.append(f"--mmlu-epochs={cfg['sft_mmlu_epochs']}")
+    if cfg["sft_gsm8k_epochs"] != 4:
+        cmd_parts.append(f"--gsm8k-epochs={cfg['sft_gsm8k_epochs']}")
+
+    sft_cmd = " ".join(cmd_parts)
+    lab.log(f"🎯 Running SFT...")
+    lab.log(f"Command: {sft_cmd}")
+    run_command(sft_cmd, "Supervised finetuning", cwd=nanochat_dir)
+
+    # Evaluate SFT model
     lab.log("📊 Evaluating SFT model...")
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_eval -i sft",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_eval -- -i sft",
         "Evaluating SFT model",
-        cwd=nanochat_dir
+        cwd=nanochat_dir,
     )
-    
-    
-    # Save final model to Model Zoo
-    if os.path.exists(model_path):
-        lab.log("💾 Saving final SFT model to Model Zoo...")
+
+    # Save SFT model to Model Zoo
+    depth = cfg["depth"]
+    model_tag = cfg["model_tag"] if cfg["model_tag"] else f"d{depth}"
+    checkpoint_dir = os.path.join(base_dir, "chatsft_checkpoints", model_tag)
+    if os.path.exists(checkpoint_dir):
+        lab.log("💾 Saving SFT model to Model Zoo...")
         lab.save_model(
-            source_path=model_path,
-            name="nanochat_d20_sft",
+            source_path=checkpoint_dir,
+            name=f"nanochat_{model_tag}_sft",
             architecture="gpt2",
-            pipeline_tag="text-generation"
+            pipeline_tag="text-generation",
         )
         lab.log("✅ SFT model saved to Model Zoo")
 
 
-def train_rl(base_dir, nanochat_dir, nproc, wandb_run, enable_rl=False):
-    """Run reinforcement learning (optional)"""
-    if not enable_rl:
+def train_rl(nanochat_dir, nproc, cfg):
+    """Run reinforcement learning on GSM8K (optional)."""
+    if not cfg["enable_rl"]:
         lab.log("⏭️  Skipping RL training (disabled)")
         return
-    
+
     lab.log("🔧 Phase: Reinforcement Learning (GSM8K)")
-    
-    # Run RL
-    lab.log("🎯 Running reinforcement learning on GSM8K...")
-    run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_rl -- --run={wandb_run}",
-        "Reinforcement learning",
-        cwd=nanochat_dir
-    )
-    
-    # Save RL checkpoint
-    model_path = os.path.join(base_dir, "checkpoints", "model_rl.pt")
-    if os.path.exists(model_path):
-        lab.save_checkpoint(model_path, "rl_model.pt")
-        lab.log("✅ RL checkpoint saved")
-    
-    # Evaluate RL model only on GSM8K
+    wandb_run = cfg["wandb_run"]
+
+    # Build RL command
+    cmd_parts = [
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_rl --",
+        f"--device-batch-size={cfg['rl_device_batch_size']}",
+        f"--examples-per-step={cfg['rl_examples_per_step']}",
+        f"--num-samples={cfg['rl_num_samples']}",
+        f"--max-new-tokens={cfg['rl_max_new_tokens']}",
+        f"--num-epochs={cfg['rl_num_epochs']}",
+        f"--run={wandb_run}",
+    ]
+
+    rl_cmd = " ".join(cmd_parts)
+    lab.log(f"🎯 Running RL on GSM8K...")
+    lab.log(f"Command: {rl_cmd}")
+    run_command(rl_cmd, "Reinforcement learning", cwd=nanochat_dir)
+
+    # Evaluate RL model on GSM8K
     lab.log("📊 Evaluating RL model on GSM8K...")
     run_command(
-        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_eval -i rl -a GSM8K",
+        f"uv run torchrun --standalone --nproc_per_node={nproc} -m scripts.chat_eval -- -i rl -a GSM8K",
         "Evaluating RL model",
-        cwd=nanochat_dir
+        cwd=nanochat_dir,
     )
-    
+
     # Save RL model to Model Zoo
-    if os.path.exists(model_path):
-        lab.log("💾 Saving final RL model to Model Zoo...")
+    base_dir = os.environ["NANOCHAT_BASE_DIR"]
+    depth = cfg["depth"]
+    model_tag = cfg["model_tag"] if cfg["model_tag"] else f"d{depth}"
+    checkpoint_dir = os.path.join(base_dir, "chatrl_checkpoints", model_tag)
+    if os.path.exists(checkpoint_dir):
+        lab.log("💾 Saving RL model to Model Zoo...")
         lab.save_model(
-            source_path=model_path,
-            name="nanochat_d20_rl",
+            source_path=checkpoint_dir,
+            name=f"nanochat_{model_tag}_rl",
             architecture="gpt2",
-            pipeline_tag="text-generation"
+            pipeline_tag="text-generation",
         )
         lab.log("✅ RL model saved to Model Zoo")
 
 
 def generate_report(nanochat_dir):
-    """Generate final training report"""
+    """Generate final training report."""
     lab.log("📝 Generating final report...")
-    run_command(
-        "uv run python -m nanochat.report generate",
-        "Generating report",
-        cwd=nanochat_dir
-    )
-        
-    # Save report as artifact
+    run_command("uv run python -m nanochat.report generate", "Generating report", cwd=nanochat_dir)
+
     report_path = os.path.join(nanochat_dir, "report.md")
     if os.path.exists(report_path):
         lab.save_artifact(report_path, "nanochat_training_report.md")
         lab.log("✅ Training report saved")
 
 
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
 def main():
-    """Main training function - runs nanochat speedrun with SDK integration"""
-    
+    """Main training function — runs the nanochat speedrun with SDK integration."""
+
     start_time = datetime.now()
-    
+
+    # ------------------------------------------------------------------
+    # 1. Initialise TransformerLab SDK and read configuration
+    # ------------------------------------------------------------------
     try:
-        # Initialize TransformerLab SDK (auto-loads parameters from job_data if available)
         lab.init()
         lab.log("🚀 Starting Nanochat Training with TransformerLab SDK")
-        
-        # Get parameters from task configuration (set via UI)
-        config = lab.get_config()
-        
-        # Extract parameters with defaults
-        try:
-            depth = int(config.get("depth", 20))
-            nproc_per_node = int(config.get("nproc_per_node", 1))
-        except (ValueError, TypeError):
-            depth = 20
-            nproc_per_node = 1
-        enable_rl = config.get("enable_rl", False)
-        log_to_wandb = config.get("log_to_wandb", False)
-        
-        lab.log(f"Training started at {start_time}")
-        lab.log(f"Configuration: depth={depth}, nproc_per_node={nproc_per_node}, enable_rl={enable_rl}")
 
+        config = lab.get_config()
     except Exception as e:
         print(f"Warning: TransformerLab SDK initialization failed: {e}")
         import traceback
         traceback.print_exc()
         config = {}
-        depth = 20
-        nproc_per_node = 1
-        enable_rl = False
-        log_to_wandb = False
-    
+
+    # Parse all parameters from config with sensible defaults matching latest speedrun.sh
+    cfg = {
+        # General
+        "nproc_per_node":         _int(config.get("nproc_per_node"), 8),
+        "enable_fp8":             _bool(config.get("enable_fp8", True)),
+        "wandb_run_name":         str(config.get("wandb_run_name", "nanochat-speedrun")),
+
+        # Dataset & Tokenizer
+        "initial_dataset_shards": _int(config.get("initial_dataset_shards"), 8),
+        "total_dataset_shards":   _int(config.get("total_dataset_shards"), 370),
+        "tokenizer_max_chars":    _int(config.get("tokenizer_max_chars"), 2_000_000_000),
+        "tokenizer_vocab_size":   _int(config.get("tokenizer_vocab_size"), 32768),
+
+        # Base model pretraining
+        "depth":                  _int(config.get("depth"), 26),
+        "target_param_data_ratio": _float(config.get("target_param_data_ratio"), 8.25),
+        "device_batch_size":      _int(config.get("device_batch_size"), 16),
+        "total_batch_size":       _int(config.get("total_batch_size"), -1),
+        "num_iterations":         _int(config.get("num_iterations"), -1),
+        "max_seq_len":            _int(config.get("max_seq_len"), 2048),
+        "window_pattern":         str(config.get("window_pattern", "SSSL")),
+        "aspect_ratio":           _int(config.get("aspect_ratio"), 64),
+        "warmdown_ratio":         _float(config.get("warmdown_ratio"), 0.5),
+        "weight_decay":           _float(config.get("weight_decay"), 0.2),
+        "eval_every":             _int(config.get("eval_every"), 250),
+        "core_metric_every":      _int(config.get("core_metric_every"), 2000),
+        "save_every":             _int(config.get("save_every"), -1),
+        "sample_every":           _int(config.get("sample_every"), 2000),
+        "model_tag":              str(config.get("model_tag", "")),
+
+        # SFT
+        "sft_device_batch_size":  _int(config.get("sft_device_batch_size"), 16),
+        "sft_num_iterations":     _int(config.get("sft_num_iterations"), -1),
+        "sft_mmlu_epochs":        _int(config.get("sft_mmlu_epochs"), 3),
+        "sft_gsm8k_epochs":       _int(config.get("sft_gsm8k_epochs"), 4),
+
+        # RL
+        "enable_rl":              _bool(config.get("enable_rl", False)),
+        "rl_num_epochs":          _int(config.get("rl_num_epochs"), 1),
+        "rl_device_batch_size":   _int(config.get("rl_device_batch_size"), 8),
+        "rl_examples_per_step":   _int(config.get("rl_examples_per_step"), 16),
+        "rl_num_samples":         _int(config.get("rl_num_samples"), 16),
+        "rl_max_new_tokens":      _int(config.get("rl_max_new_tokens"), 256),
+    }
+
+    lab.log(f"Training started at {start_time}")
+    lab.log(f"Configuration: {cfg}")
+
+    # ------------------------------------------------------------------
+    # 2. Determine WANDB run name
+    # ------------------------------------------------------------------
+    if os.environ.get("WANDB_API_KEY"):
+        cfg["wandb_run"] = cfg["wandb_run_name"]
+        lab.log("🔑 WANDB_API_KEY found — wandb will log")
+    else:
+        cfg["wandb_run"] = "dummy"
+        lab.log("ℹ️  No WANDB_API_KEY found, training will run without wandb logging")
+
+    # ------------------------------------------------------------------
+    # 3. Detect GPUs and resolve nproc
+    # ------------------------------------------------------------------
+    detected_gpus = get_available_gpus()
+    nproc_requested = cfg["nproc_per_node"]
+    if detected_gpus > 0:
+        if nproc_requested > detected_gpus:
+            lab.log(f"⚠️  Requested {nproc_requested} GPUs, but only {detected_gpus} detected. Capping to {detected_gpus}.")
+            nproc = detected_gpus
+        else:
+            nproc = nproc_requested
+    elif nproc_requested > 0:
+        lab.log(f"⚠️  No GPUs detected via nvidia-smi or torch. Using {nproc_requested} as configured.")
+        nproc = nproc_requested
+    else:
+        nproc = 1
+
     try:
-        # Setup directories
-        base_dir = os.path.expanduser("~/nanochat_data")
+        # ------------------------------------------------------------------
+        # 4. Setup directories & clone repo
+        # ------------------------------------------------------------------
+        base_dir = os.path.expanduser("~/.cache/nanochat")
         os.makedirs(base_dir, exist_ok=True)
-        
         lab.log(f"Training data directory: {base_dir}")
-        
-        # Clone nanochat repository if not exists or if it's not a valid repo
-        # We use ~/nanochat-repo to avoid collision with potential workspace folders named 'nanochat'
+
         nanochat_dir = os.path.abspath(os.path.expanduser("~/nanochat-repo"))
-        
+
         if not os.path.exists(nanochat_dir) or not os.path.exists(os.path.join(nanochat_dir, "pyproject.toml")):
             if os.path.exists(nanochat_dir):
                 lab.log(f"⚠️  {nanochat_dir} exists but is missing pyproject.toml. Re-cloning...")
@@ -398,128 +472,102 @@ def main():
                     shutil.rmtree(nanochat_dir)
                 except Exception:
                     pass
-            
             lab.log(f"📥 Cloning nanochat repository to {nanochat_dir}...")
             run_command(
                 f"git clone https://github.com/karpathy/nanochat.git {nanochat_dir}",
                 "Cloning nanochat repository",
-                stream_output=True
             )
         else:
             lab.log(f"✅ Nanochat repository found: {nanochat_dir}")
-        
-        # Setup WANDB run name
-        wandb_run = f"nanochat-speedrun"
-        if os.environ.get("WANDB_API_KEY"):
-            lab.log(f"🔑 WANDB_API_KEY found - wandb will log")
-        else:
-            wandb_run = "dummy"  # Skip wandb logging
-            lab.log("ℹ️  No WANDB_API_KEY found, training will run without wandb logging")
-        
-        # Determine actual GPU count to avoid "invalid device ordinal" errors
-        detected_gpus = get_available_gpus()
-        if detected_gpus > 0:
-            if nproc_per_node > detected_gpus:
-                lab.log(f"⚠️  Requested {nproc_per_node} GPUs, but only {detected_gpus} detected. Capping to {detected_gpus}.")
-                nproc = detected_gpus
-            else:
-                nproc = nproc_per_node
-        elif nproc_per_node > 0:
-            # If no GPUs detected but requested > 0, we might be in an environment where detection fails
-            # but we'll try with 1 to see if it works, or just fallback to configured value if we're unsure
-            lab.log(f"⚠️  No GPUs detected via nvidia-smi or torch. Using {nproc_per_node} as configured.")
-            nproc = nproc_per_node
-        else:
-            nproc = 1
-        
+
         # Deactivate conda if active (to avoid conflicts with uv venv)
         if os.environ.get("CONDA_PREFIX"):
             lab.log("⚠️  Conda environment detected, clearing conda variables...")
-            conda_vars_to_unset = ["CONDA_PREFIX", "CONDA_DEFAULT_ENV", "CONDA_PROMPT_MODIFIER", 
-                                    "CONDA_SHLVL", "CONDA_PYTHON_EXE", "CONDA_EXE"]
-            for var in conda_vars_to_unset:
-                if var in os.environ:
-                    del os.environ[var]
+            for var in ["CONDA_PREFIX", "CONDA_DEFAULT_ENV", "CONDA_PROMPT_MODIFIER",
+                        "CONDA_SHLVL", "CONDA_PYTHON_EXE", "CONDA_EXE"]:
+                os.environ.pop(var, None)
             lab.log("✅ Conda environment variables cleared")
-        
-        # Check if RL is enabled
-        enable_rl_training = enable_rl
-        
+
+        # ------------------------------------------------------------------
+        # 5. Log training plan
+        # ------------------------------------------------------------------
         lab.log("🚀 Starting Nanochat Speedrun Training Pipeline")
-        lab.log("This will take approximately 4 hours on 8xH100...")
-        if enable_rl_training:
+        lab.log(f"Pipeline: Tokenizer → Base d{cfg['depth']} Pretraining → SFT" + (" → RL" if cfg["enable_rl"] else ""))
+        lab.log(f"Estimated time: ~3 hours on 8xH100 (depth={cfg['depth']}, fp8={cfg['enable_fp8']})")
+        if cfg["enable_rl"]:
             lab.log("✅ RL training is ENABLED (will train on GSM8K)")
         else:
-            lab.log("⏭️  RL training is DISABLED (set enable_rl=True in config to enable)")
-        
-        # Run all training phases
+            lab.log("⏭️  RL training is DISABLED (set enable_rl=true to enable)")
+
+        # ------------------------------------------------------------------
+        # 6. Run all training phases
+        # ------------------------------------------------------------------
         setup_environment(base_dir, nanochat_dir, nproc)
-        
+
         # Initialize report (after environment setup)
-        run_command(
-            "uv run python -m nanochat.report reset",
-            "Initializing report",
-            cwd=nanochat_dir
+        run_command("uv run python -m nanochat.report reset", "Initializing report", cwd=nanochat_dir)
+
+        # Activate the venv so that `python` resolves to the project's venv
+        venv_activate = os.path.join(nanochat_dir, ".venv", "bin", "activate")
+        if os.path.exists(venv_activate):
+            venv_bin = os.path.join(nanochat_dir, ".venv", "bin")
+            os.environ["PATH"] = venv_bin + ":" + os.environ.get("PATH", "")
+            os.environ["VIRTUAL_ENV"] = os.path.join(nanochat_dir, ".venv")
+
+        # Phase 1: Tokenizer
+        dataset_process = train_tokenizer(
+            nanochat_dir,
+            initial_shards=cfg["initial_dataset_shards"],
+            total_shards=cfg["total_dataset_shards"],
+            max_chars=cfg["tokenizer_max_chars"],
+            vocab_size=cfg["tokenizer_vocab_size"],
         )
-        dataset_process = train_tokenizer(base_dir, nanochat_dir)
-        train_base_model(base_dir, nanochat_dir, dataset_process, nproc, wandb_run)
-        train_midtraining(base_dir, nanochat_dir, nproc, wandb_run)
-        train_sft(base_dir, nanochat_dir, nproc, wandb_run)
-        train_rl(base_dir, nanochat_dir, nproc, wandb_run, enable_rl_training)
+
+        # Phase 2: Base model pretraining
+        train_base_model(nanochat_dir, dataset_process, nproc, cfg)
+
+        # Phase 3: SFT
+        train_sft(nanochat_dir, nproc, cfg)
+
+        # Phase 4: RL (optional)
+        train_rl(nanochat_dir, nproc, cfg)
+
+        # Phase 5: Report
         generate_report(nanochat_dir)
-        
+
+        # ------------------------------------------------------------------
+        # 7. Wrap up
+        # ------------------------------------------------------------------
         lab.update_progress(100)
         lab.log("✅ All training phases completed!")
-        
-        # Check for final model in checkpoints
-        checkpoint_dir = os.path.join(base_dir, "checkpoints")
+
+        # List found checkpoints
         models_found = []
-        if os.path.exists(checkpoint_dir):
-            model_files = ["model_sft.pt", "model_mid.pt", "model_d20.pt"]
-            if enable_rl_training:
-                model_files.append("model_rl.pt")
-            for model_file in model_files:
-                model_path = os.path.join(checkpoint_dir, model_file)
-                if os.path.exists(model_path):
-                    models_found.append(model_file)
-            lab.log(f"✅ Found model checkpoints: {', '.join(models_found) if models_found else 'none'}")
-        
+        depth = cfg["depth"]
+        model_tag = cfg["model_tag"] if cfg["model_tag"] else f"d{depth}"
+        for ckpt_dir_name in ["base_checkpoints", "chatsft_checkpoints", "chatrl_checkpoints"]:
+            ckpt_path = os.path.join(base_dir, ckpt_dir_name, model_tag)
+            if os.path.exists(ckpt_path):
+                models_found.append(ckpt_dir_name)
+        lab.log(f"✅ Found checkpoint dirs: {', '.join(models_found) if models_found else 'none'}")
+
         # Check for report
         report_path = os.path.join(nanochat_dir, "report.md")
         if os.path.exists(report_path):
             lab.log("✅ Training report generated successfully")
         else:
             lab.log("⚠️  Training report not found")
-        
-        # Training completed
+
         end_time = datetime.now()
         training_duration = end_time - start_time
         lab.log(f"🎉 Training completed in {training_duration}")
-        
-        # Get wandb URL if available
-        try:
-            job_data = lab.job.get_job_data()
-            captured_wandb_url = job_data.get("wandb_run_url", "Not available")
-            lab.log(f"📊 Wandb URL: {captured_wandb_url}")
-        except Exception:
-            captured_wandb_url = "Not available"
-        
-        # Finish wandb run
-        try:
-            import wandb
-            if wandb.run is not None:
-                wandb.finish()
-                lab.log("✅ Wandb run finished")
-        except Exception:
-            pass
-        
+
         lab.finish()
 
         return {
             "status": "success",
             "duration": str(training_duration),
-            "model": "nanochat-d20",
-            "wandb_url": captured_wandb_url,
+            "model": f"nanochat-{model_tag}",
             "checkpoints": models_found,
             "base_dir": base_dir,
         }
@@ -541,7 +589,7 @@ def main():
 if __name__ == "__main__":
     try:
         result = main()
-        print(f"\n✅ Nanochat Training Result: {result}")        
+        print(f"\n✅ Nanochat Training Result: {result}")
     except Exception as e:
         print(f"❌ Fatal error: {e}")
         sys.exit(1)

@@ -1,0 +1,16 @@
+name: mnist-jax-train
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: mnist-jax-train
+resources:
+  accelerators: "RTX3090:1"
+setup: "uv pip install transformerlab jax flax optax matplotlib wandb && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
+run: "cd ~/mnist-jax-train && python train.py"
+envs:
+  WANDB_PROJECT: "mnist-jax-training-project"
+  PYTHONUNBUFFERED: "1"
+  WANDB_API_KEY: "<your_wandb_api_key_here>"
+parameters:
+  epochs: "1"
+  batch_size: "64"
+  learning_rate: "1e-3"
+  prediction_save_every_steps: "200"

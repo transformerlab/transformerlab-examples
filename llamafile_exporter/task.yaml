@@ -1,0 +1,14 @@
+name: llamafile-exporter-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: llamafile_exporter
+resources:
+  accelerators: "RTX3090:1"
+setup: "uv pip install transformerlab huggingface-hub; sudo apt update; sudo apt install -y curl;"
+run: "cd ~/llamafile_exporter && python train.py"
+envs:
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+parameters:
+  model_name: "gpt-j-6b"
+  model_path: "./model.gguf"
+  output_dir: "./output"

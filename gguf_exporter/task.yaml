@@ -1,0 +1,14 @@
+name: gguf-exporter-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: gguf_exporter
+resources:
+  accelerators: "RTX3090:1"
+setup: "uv pip install transformerlab huggingface-hub torch; sudo apt update; sudo apt install -y git;"
+run: "cd ~/gguf_exporter && python train.py"
+envs:
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+parameters:
+  model_name: "unsloth/Qwen2.5-0.5B-Instruct"
+  output_dir: "./output"
+  outtype: "q8_0"

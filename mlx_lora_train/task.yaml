@@ -1,8 +1,6 @@
 name: mlx-lora-train-task
 github_repo_url: https://github.com/transformerlab/transformerlab-examples
 github_repo_dir: mlx_lora_train
-resources:
-  accelerators: "M1:1"
 setup: "uv pip install transformerlab mlx==0.29.3 mlx-lm==0.28.3 datasets jinja2 transformers huggingface-hub pyyaml wandb"
 run: "cd ~/mlx_lora_train && python train.py"
 envs:

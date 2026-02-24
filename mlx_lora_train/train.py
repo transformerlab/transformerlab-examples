@@ -16,9 +16,9 @@ import sys
 import time
 import yaml
 
+from jinja2 import Environment
+from datasets import load_dataset, get_dataset_split_names, get_dataset_config_names
 from lab import lab
-
-# Login to huggingface if token is available
 from huggingface_hub import login
 
 if os.getenv("HF_TOKEN"):
@@ -30,34 +30,67 @@ if os.getenv("HF_TOKEN"):
 # ---------------------------------------------------------------------------
 
 
+def format_two_columns_with_template(
+    example,
+    prompt_column,
+    completion_column,
+    chat_template,
+):
+    """
+    Format two columns (prompt and completion) using a chat template.
+    
+    Args:
+        example: The data example (dict)
+        prompt_column: Name of the column containing the prompt/question
+        completion_column: Name of the column containing the completion/answer
+        chat_template: Jinja2 template string with {{prompt}} and {{completion}} placeholders
+    
+    Returns:
+        Formatted string based on the chat template
+    """    
+    jinja_env = Environment()
+    tmpl = jinja_env.from_string(chat_template)
+    
+    # Render template with the two columns
+    return tmpl.render(
+        prompt=example.get(prompt_column, ""),
+        completion=example.get(completion_column, ""),
+    )
+
+
 def prepare_dataset_files(
     data_directory,
     datasets,
     formatting_template=None,
     chat_template=None,
     model_name=None,
-    chat_column="messages",
+    prompt_column=None,
+    completion_column=None,
 ):
     """
     Prepare train.jsonl / valid.jsonl for MLX from HuggingFace dataset splits.
 
-    Applies either a Jinja formatting_template or a chat_template (using the
-    model's tokenizer) to each example, then writes one JSON-Lines file per split.
+    Applies either a Jinja formatting_template or two-column formatting 
+    (prompt + completion via chat_template) to each example, then writes 
+    one JSON-Lines file per split.
+    
+    Args:
+        data_directory: Where to save the formatted dataset files
+        datasets: Dict of split name → HuggingFace Dataset
+        formatting_template: Jinja2 template for custom formatting
+        chat_template: Jinja2 template with {{prompt}} and {{completion}} placeholders
+        model_name: Model name (unused currently, reserved for future use)
+        prompt_column: Column name for prompts (used with two-column formatting)
+        completion_column: Column name for completions (used with two-column formatting)
     """
-    from jinja2 import Environment
-    from transformers import AutoTokenizer
-
-    tokenizer = None
-    if chat_template:
-        tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
     def _format(example):
-        if chat_template and tokenizer and tokenizer.chat_template:
-            return tokenizer.apply_chat_template(
-                example[chat_column],
-                tokenize=False,
-                add_generation_prompt=False,
-                chat_template=chat_template,
+        if chat_template and prompt_column and completion_column:
+            return format_two_columns_with_template(
+                example,
+                prompt_column,
+                completion_column,
+                chat_template,
             )
         if formatting_template:
             jinja_env = Environment()
@@ -99,7 +132,6 @@ def load_datasets(dataset_name, splits=None, config_name=None):
     Returns a dict mapping split name → HuggingFace Dataset object.
     If no validation split exists, automatically creates an 80/20 split.
     """
-    from datasets import load_dataset, get_dataset_split_names, get_dataset_config_names
 
     if splits is None:
         splits = ["train", "valid"]
@@ -183,9 +215,9 @@ def train_mlx_lora():
         save_every = int(config.get("save_every", 1000))
         lora_rank = config.get("lora_rank", None)
         lora_alpha = config.get("lora_alpha", None)
-        chat_template = config.get("formatting_chat_template", None)
-        chat_column = config.get("chatml_formatted_column", "messages")
-        formatting_template = config.get("formatting_template", None)
+        formatting_template = config.get("formatting_template", "{{prompt}} {{completion}}")
+        prompt_column = config.get("prompt_column", "prompt")
+        completion_column = config.get("completion_column", "completion")
 
         # ----- Load dataset -----
         lab.log("Loading dataset…")
@@ -236,9 +268,10 @@ def train_mlx_lora():
             data_directory=data_directory,
             datasets=datasets,
             formatting_template=formatting_template,
-            chat_template=chat_template,
+            chat_template=None,
             model_name=model_name,
-            chat_column=chat_column,
+            prompt_column=prompt_column,
+            completion_column=completion_column,
         )
 
         # ----- Check for checkpoint resume -----

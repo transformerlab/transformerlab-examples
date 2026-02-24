@@ -169,8 +169,8 @@ def train_mlx_lora():
         config = lab.get_config()
 
         # ----- Extract configuration parameters -----
-        model_name = config.get("model_name", "")
-        dataset_name = config.get("dataset_name", config.get("dataset", ""))
+        model_name = config.get("model_name", "mlx-community/Llama-3.2-1B-Instruct-4bit")
+        dataset_name = config.get("dataset", "Trelis/touch-rugby-rules"
         lora_layers = config.get("lora_layers", 16)
         learning_rate = config.get("learning_rate", 5e-5)
         batch_size = int(config.get("batch_size", 4))

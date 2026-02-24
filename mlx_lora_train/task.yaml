@@ -23,3 +23,6 @@ parameters:
   save_every: 100
   fuse_model: true
   log_to_wandb: false
+  formatting_template: "{{prompt}} {{completion}}"
+  prompt_column: "prompt"
+  completion_column: "completion"

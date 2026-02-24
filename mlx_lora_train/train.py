@@ -126,10 +126,18 @@ def load_datasets(dataset_name, splits=None, config_name=None):
 
     if "validation" in available_splits and "valid" in dataset_splits:
         dataset_splits["valid"] = "validation"
+    elif "test" in available_splits and "valid" in dataset_splits:
+        # Map "test" to "valid" if test exists but valid doesn't
+        dataset_splits["valid"] = "test"
+        print("Mapping 'test' split to 'valid' for training.")
     elif "valid" in splits and "valid" not in available_splits:
-        print("No validation split found, splitting train 80/20.")
-        dataset_splits["valid"] = dataset_splits["train"] + "[-20%:]"
-        dataset_splits["train"] = dataset_splits["train"] + "[:80%]"
+        # Only do the 80/20 split if train split exists
+        if "train" in dataset_splits:
+            print("No validation split found, splitting train 80/20.")
+            dataset_splits["valid"] = dataset_splits["train"] + "[-20%:]"
+            dataset_splits["train"] = dataset_splits["train"] + "[:80%]"
+        else:
+            print(f"Warning: 'valid' split requested but not available, and 'train' split not found either.")
 
     # Avoid identical train/valid
     for expected, actual in list(dataset_splits.items()):

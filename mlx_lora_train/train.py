@@ -281,9 +281,10 @@ def train_mlx_lora():
             adaptor_output_dir = checkpoint
 
         # ----- Build the MLX LoRA training command -----
-        # Activate venv in the same directory and use its Python executable
+        # Activate venv one level up from the script directory and use its Python executable
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        venv_python = os.path.join(script_dir, "venv", "bin", "python")
+        parent_dir = os.path.dirname(script_dir)
+        venv_python = os.path.join(parent_dir, "venv", "bin", "python")
         
         # Use venv Python if it exists, otherwise fall back to current executable
         python_executable = venv_python if os.path.exists(venv_python) else sys.executable

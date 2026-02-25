@@ -281,13 +281,7 @@ def train_mlx_lora():
             adaptor_output_dir = checkpoint
 
         # ----- Build the MLX LoRA training command -----
-        # Use the venv Python when running inside a local-provider job,
-        # otherwise fall back to the current interpreter.
-        venv = os.environ.get("VIRTUAL_ENV")
-        if venv and os.path.isfile(os.path.join(venv, "bin", "python")):
-            python_executable = os.path.join(venv, "bin", "python")
-        else:
-            python_executable = sys.executable
+        python_executable = lab.get_python_executable_local_provider()
 
         popen_command = [
             python_executable,

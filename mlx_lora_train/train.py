@@ -443,12 +443,16 @@ def train_mlx_lora():
             if return_code == 0:
                 lab.update_progress(95)
                 lab.log("Saving fused model…")
-                lab.save_model(
-                    fused_model_location,
-                    name=fused_model_name,
-                    architecture="MLX",
-                    parent_model=model_name,
-                )
+                try:
+                    import asyncio
+                    asyncio.run(lab.async_save_model(
+                        fused_model_location,
+                        name=fused_model_name,
+                        architecture="MLX",
+                        parent_model=model_name,
+                    ))
+                except Exception as e:
+                    lab.log(f"⚠️  Could not save fused model: {e}")
                 lab.log("✅ Model fusion complete.")
                 lab.update_progress(98)
             else:

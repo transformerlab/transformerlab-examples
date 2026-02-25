@@ -281,7 +281,7 @@ def train_mlx_lora():
             adaptor_output_dir = checkpoint
 
         # ----- Build the MLX LoRA training command -----
-        python_executable = lab.get_python_executable_local_provider()
+        python_executable = sys.executable
 
         popen_command = [
             python_executable,

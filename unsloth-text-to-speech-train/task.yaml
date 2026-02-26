@@ -8,8 +8,8 @@ run: "cd ~/unsloth-text-to-speech-train && python train.py"
 envs:
   WANDB_PROJECT: "unsloth-text-to-speech-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "unsloth/orpheus-3b-0.1-ft"
   dataset: "bosonai/EmergentTTS-Eval"

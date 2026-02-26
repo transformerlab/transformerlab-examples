@@ -7,7 +7,7 @@ setup: "uv pip install transformerlab lm_eval==0.4.7 pandas torch"
 run: "cd ~/eleutherai-lm-evaluation-harness && python train.py"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "<your_huggingface_token_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   model_name: "HuggingFaceTB/SmolLM-135M-Instruct"
   model_path: ""

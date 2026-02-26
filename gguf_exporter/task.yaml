@@ -7,7 +7,7 @@ setup: "uv pip install transformerlab huggingface-hub torch; sudo apt update; su
 run: "cd ~/gguf_exporter && python train.py"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   model_name: "unsloth/Qwen2.5-0.5B-Instruct"
   output_dir: "./output"

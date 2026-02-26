@@ -8,8 +8,8 @@ run: "cd ~/unsloth-grpo-train && python train.py"
 envs:
   WANDB_PROJECT: "unsloth-grpo-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "unsloth/SmolLM2-135M"
   dataset: "openai/gsm8k"

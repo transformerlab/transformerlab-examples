@@ -7,7 +7,7 @@ setup: "uv pip install transformerlab deepeval==2.8.2 bert-score==0.3.13 dataset
 run: "cd ~/objective-eval && python train.py"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "<your_huggingface_token_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   tasks: "Rouge"
   threshold: "0.5"

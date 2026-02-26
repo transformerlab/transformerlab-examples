@@ -8,8 +8,8 @@ run: "cd ~/unsloth-llm-train && python train.py"
 envs:
   WANDB_PROJECT: "unsloth-llm-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "unsloth/Qwen2.5-0.5B-Instruct"
   dataset: "Trelis/touch-rugby-rules"

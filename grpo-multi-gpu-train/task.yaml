@@ -7,6 +7,6 @@ setup: "uv pip install trl bitsandbytes accelerate transformerlab datasets jinja
 run: "cd ~/grpo-multi-gpu-train && python train.py"
 envs:
   WANDB_PROJECT: "grpo-multi-gpu-training"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"

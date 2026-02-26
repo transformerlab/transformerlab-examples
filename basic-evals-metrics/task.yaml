@@ -7,7 +7,7 @@ setup: "uv pip install transformerlab datasets pandas RestrictedPython==8.0.0;"
 run: "cd ~/basic-evals-metrics && python train.py"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "<your_huggingface_token_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   dataset_name: "openai/gsm8k"
   input_col: "question"

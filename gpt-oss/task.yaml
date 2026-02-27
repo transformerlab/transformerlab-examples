@@ -7,7 +7,7 @@ setup: "uv pip install transformerlab datasets transformers==4.57.3 torch trl pe
 run: "cd ~/gpt-oss && python train.py"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "<your_huggingface_token_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   model_name: "openai/gpt-oss-20b"
   dataset: "HuggingFaceH4/Multilingual-Thinking"

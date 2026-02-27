@@ -7,7 +7,7 @@ setup: "uv pip install transformerlab huggingface-hub; sudo apt update; sudo apt
 run: "cd ~/llamafile_exporter && python train.py"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   model_name: "gpt-j-6b"
   model_path: "./model.gguf"

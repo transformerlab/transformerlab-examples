@@ -8,8 +8,8 @@ run: "cd ~/autotrain-sft && python train.py"
 envs:
   WANDB_PROJECT: "autotrain-sft-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-  WANDB_API_KEY: "<your_wandb_api_key_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "microsoft/DialoGPT-small"
   dataset: "HuggingFaceH4/no_robots"

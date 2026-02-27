@@ -7,6 +7,6 @@ setup: "uv pip install transformers trl peft bitsandbytes accelerate transformer
 run: "cd ~/lora-trainer-multi-gpu && python train.py"
 envs:
   WANDB_PROJECT: "lora-multi-gpu-training"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"

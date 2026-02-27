@@ -8,7 +8,7 @@ run: "cd ~/mnist-jax-train && python train.py"
 envs:
   WANDB_PROJECT: "mnist-jax-training-project"
   PYTHONUNBUFFERED: "1"
-  WANDB_API_KEY: "<your_wandb_api_key_here>"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   epochs: "1"
   batch_size: "64"

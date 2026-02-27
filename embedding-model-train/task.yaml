@@ -7,9 +7,9 @@ setup: "uv pip install transformerlab numpy==1.26.4 pyarrow==15.0.0 fsspec==2023
 run: "cd ~/embedding-model-train && python train.py"
 envs:
   WANDB_PROJECT: "embedding-model-training"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 parameters:
   model_name: "sentence-transformers/paraphrase-MiniLM-L3-v2"
   dataset_name: "sentence-transformers/stsb"

@@ -5,7 +5,7 @@ resources:
   cpus: 2
   memory: 4
 setup: "uv pip install torch torchvision wandb transformerlab matplotlib"
-run: "cd ~/mnist-train && python mnist_train.py"
+run: "python ~/mnist-train/mnist_train.py"
 envs:
   WANDB_API_KEY: "<your_wandb_api_key_here>"
   WANDB_PROJECT: "mnist-training-project"

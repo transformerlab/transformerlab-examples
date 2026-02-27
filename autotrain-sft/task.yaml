@@ -4,7 +4,7 @@ github_repo_dir: autotrain-sft
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install autotrain-advanced bitsandbytes transformerlab wandb"
-run: "cd ~/autotrain-sft && python train.py"
+run: "python ~/autotrain-sft/train.py"
 envs:
   WANDB_PROJECT: "autotrain-sft-training"
   PYTHONUNBUFFERED: "1"

@@ -4,7 +4,7 @@ github_repo_dir: mnist-jax-train
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install transformerlab jax flax optax matplotlib wandb && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
-run: "cd ~/mnist-jax-train && python train.py"
+run: "python ~/mnist-jax-train/train.py"
 envs:
   WANDB_PROJECT: "mnist-jax-training-project"
   PYTHONUNBUFFERED: "1"

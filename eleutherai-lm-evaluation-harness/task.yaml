@@ -4,7 +4,7 @@ github_repo_dir: eleutherai-lm-evaluation-harness
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install transformerlab lm_eval==0.4.7 pandas torch"
-run: "cd ~/eleutherai-lm-evaluation-harness && python train.py"
+run: "python ~/eleutherai-lm-evaluation-harness/train.py"
 envs:
   PYTHONUNBUFFERED: "1"
   HF_TOKEN: "<your_huggingface_token_here>"

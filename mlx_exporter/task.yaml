@@ -4,7 +4,7 @@ github_repo_dir: mlx_exporter
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install transformerlab mlx==0.29.3 mlx-lm==0.28.3 huggingface-hub;"
-run: "cd ~/mlx_exporter && python train.py"
+run: "python ~/mlx_exporter/train.py"
 envs:
   PYTHONUNBUFFERED: "1"
   HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"

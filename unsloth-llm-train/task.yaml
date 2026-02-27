@@ -4,7 +4,7 @@ github_repo_dir: unsloth-llm-train
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install unsloth==2025.12.5 transformers==4.57.3 datasets huggingface-hub torch transformerlab wandb"
-run: "cd ~/unsloth-llm-train && python train.py"
+run: "python ~/unsloth-llm-train/train.py"
 envs:
   WANDB_PROJECT: "unsloth-llm-training"
   PYTHONUNBUFFERED: "1"

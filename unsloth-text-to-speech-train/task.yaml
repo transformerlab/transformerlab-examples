@@ -4,7 +4,7 @@ github_repo_dir: unsloth-text-to-speech-train
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install unsloth snac transformerlab datasets==3.6.0 librosa soundfile"
-run: "cd ~/unsloth-text-to-speech-train && python train.py"
+run: "python ~/unsloth-text-to-speech-train/train.py"
 envs:
   WANDB_PROJECT: "unsloth-text-to-speech-training"
   PYTHONUNBUFFERED: "1"

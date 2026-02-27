@@ -4,7 +4,7 @@ github_repo_dir: gpt-oss
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install transformerlab datasets transformers==4.57.3 torch trl peft lm_eval==0.4.7;sudo apt update;sudo apt install -y libgl1 libglib2.0-0;"
-run: "cd ~/gpt-oss && python train.py"
+run: "python ~/gpt-oss/train.py"
 envs:
   PYTHONUNBUFFERED: "1"
   HF_TOKEN: "<your_huggingface_token_here>"

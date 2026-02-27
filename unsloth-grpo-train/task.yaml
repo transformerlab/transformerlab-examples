@@ -4,7 +4,7 @@ github_repo_dir: unsloth-grpo-train
 resources:
   accelerators: "A100-80GB:1"
 setup: "uv pip install trl bitsandbytes unsloth transformerlab datasets jinja2"
-run: "cd ~/unsloth-grpo-train && python train.py"
+run: "python ~/unsloth-grpo-train/train.py"
 envs:
   WANDB_PROJECT: "unsloth-grpo-training"
   PYTHONUNBUFFERED: "1"

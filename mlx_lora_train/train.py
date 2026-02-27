@@ -223,6 +223,7 @@ def train_mlx_lora():
         lab.log("Loading dataset…")
         datasets = load_datasets(dataset_name, ["train", "valid"])
         lab.log(f"Dataset loaded: {len(datasets.get('train', []))} train, {len(datasets.get('valid', []))} valid")
+        lab.update_progress(20)
 
         # ----- Epoch-based training -----
         if num_train_epochs is not None and str(num_train_epochs) != "" and int(num_train_epochs) >= 0:
@@ -273,6 +274,7 @@ def train_mlx_lora():
             prompt_column=prompt_column,
             completion_column=completion_column,
         )
+        lab.update_progress(40)
 
         # ----- Check for checkpoint resume -----
         checkpoint = lab.get_checkpoint_to_resume()
@@ -321,7 +323,7 @@ def train_mlx_lora():
 
         lab.log(f"Running command: {' '.join(popen_command)}")
         lab.log(f"Adaptor will be saved in: {adaptor_output_dir}")
-        lab.update_progress(10)
+        lab.update_progress(60)
         lab.log("Starting training…")
 
         # ----- Progress mapping: training runs from 10% → 90% -----
@@ -390,7 +392,7 @@ def train_mlx_lora():
         if process.returncode and process.returncode != 0:
             raise RuntimeError("Training failed — mlx_lm lora returned non-zero exit code.")
 
-        lab.update_progress(TRAIN_PROGRESS_END)
+        lab.update_progress(80)
         lab.log("Training completed.")
 
         # ----- Save checkpoint of the trained adaptor -----

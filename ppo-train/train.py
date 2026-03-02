@@ -115,16 +115,16 @@ if __name__ == "__main__":
         training_args.reward_model_path = cfg.get("reward_model_path", "EleutherAI/pythia-1b-deduped")
 
     if getattr(training_args, "total_episodes", None) in (None, 0):
-        training_args.total_episodes = cfg.get("total_episodes", 10000)
+        training_args.total_episodes = int(cfg.get("total_episodes", 10000))
 
     if getattr(training_args, "per_device_train_batch_size", None) in (None, 0):
-        training_args.per_device_train_batch_size = cfg.get("per_device_train_batch_size", 64)
+        training_args.per_device_train_batch_size = int(cfg.get("per_device_train_batch_size", 64))
 
     if getattr(training_args, "gradient_accumulation_steps", None) in (None, 0):
-        training_args.gradient_accumulation_steps = cfg.get("gradient_accumulation_steps", 1)
+        training_args.gradient_accumulation_steps = int(cfg.get("gradient_accumulation_steps", 1))
 
     if getattr(training_args, "missing_eos_penalty", None) in (None, 0):
-        training_args.missing_eos_penalty = cfg.get("missing_eos_penalty", 1.0)
+        training_args.missing_eos_penalty = float(cfg.get("missing_eos_penalty", 1.0))
 
     lab.log("Starting PPO training run")
 

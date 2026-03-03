@@ -39,3 +39,7 @@ parameters:
   system_prompt: "You are a helpful assistant that solves math problems step by step."
   input_template: "{{ question }}"
   output_template: "{{ answer }}"
+  llm_judge_enabled: false
+  llm_judge_server_url: "http://localhost:8000/v1"
+  llm_judge_model_name: ""
+  llm_judge_prompt: "Rate the quality of the following response to the given question.\nConsider correctness, clarity, and reasoning quality.\n\nQuestion: {prompt}\n\nResponse: {completion}\n\nScore (respond with ONLY a number between 0.0 and 2.0, where 0.0 is completely wrong and 2.0 is perfect):"

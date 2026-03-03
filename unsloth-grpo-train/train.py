@@ -7,6 +7,7 @@ from jinja2 import Environment
 from transformers import BitsAndBytesConfig
 from trl import GRPOConfig, GRPOTrainer
 from datetime import datetime
+import requests as http_requests
 from transformers import (
     TrainingArguments,
     TrainerCallback,
@@ -195,6 +196,21 @@ def train_model():
         input_template = config.get("input_template", "{{ question }}")
         output_template = config.get("output_template", "{{ answer }}")
 
+        # LLM-as-Judge configuration
+        llm_judge_enabled = str(config.get("llm_judge_enabled", False)).lower() in ("true", "1", "yes")
+        llm_judge_server_url = config.get("llm_judge_server_url", "http://localhost:8000/v1")
+        llm_judge_model_name = config.get("llm_judge_model_name", "")
+        llm_judge_prompt = config.get("llm_judge_prompt", (
+            "Rate the quality of the following response to the given question.\n"
+            "Consider correctness, clarity, and reasoning quality.\n\n"
+            "Question: {prompt}\n\n"
+            "Response: {completion}\n\n"
+            "Score (respond with ONLY a number between 0.0 and 2.0, "
+            "where 0.0 is completely wrong and 2.0 is perfect):"
+        ))
+        if llm_judge_enabled:
+            lab.log(f"🔍 LLM-as-Judge enabled: model={llm_judge_model_name} at {llm_judge_server_url}")
+
         # Training configuration
         training_config = {
             "experiment_name": "unsloth-grpo-training",
@@ -354,6 +370,66 @@ def train_model():
             matches = [re.match(pattern, r) for r in responses]
             return [0.5 if match else 0.0 for match in matches]
 
+        def llm_judge_reward_func(prompts, completions, **kwargs) -> list[float]:
+            """Reward function that uses an external LLM server (e.g. vLLM) as a judge.
+
+            Sends each (prompt, completion) pair to an OpenAI-compatible
+            /chat/completions endpoint and asks the judge model to rate the
+            response quality on a 0.0–2.0 scale.
+            """
+            responses = [
+                completion if isinstance(completion, str) else completion[0]["content"]
+                for completion in completions
+            ]
+            rewards = []
+
+            for prompt_text, response_text in zip(prompts, responses):
+                prompt_str = (
+                    prompt_text
+                    if isinstance(prompt_text, str)
+                    else prompt_text[-1]["content"]
+                )
+                judge_query = llm_judge_prompt.format(
+                    prompt=prompt_str, completion=response_text
+                )
+
+                try:
+                    resp = http_requests.post(
+                        f"{llm_judge_server_url}/chat/completions",
+                        json={
+                            "model": llm_judge_model_name,
+                            "messages": [
+                                {
+                                    "role": "system",
+                                    "content": (
+                                        "You are a precise scoring assistant. "
+                                        "Respond with ONLY a single number."
+                                    ),
+                                },
+                                {"role": "user", "content": judge_query},
+                            ],
+                            "temperature": 0.0,
+                            "max_tokens": 16,
+                        },
+                        timeout=30,
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    score_text = result["choices"][0]["message"]["content"].strip()
+                    # Extract the first numeric value from the response
+                    match = re.search(r"(\d+\.?\d*)", score_text)
+                    if match:
+                        score = float(match.group(1))
+                        score = max(0.0, min(2.0, score))  # clamp to [0.0, 2.0]
+                    else:
+                        score = 0.0
+                    rewards.append(score)
+                except Exception as e:
+                    lab.log(f"⚠️ LLM judge request failed: {e}")
+                    rewards.append(0.0)
+
+            return rewards
+
         lab.update_progress(40)
 
         # BitsAndBytes configuration
@@ -457,7 +533,7 @@ def train_model():
                 int_reward_func,
                 strict_format_reward_func,
                 soft_format_reward_func,
-            ],
+            ] + ([llm_judge_reward_func] if llm_judge_enabled else []),
             args=args,
             callbacks=[progress_callback],
         )

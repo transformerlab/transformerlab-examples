@@ -192,13 +192,15 @@ def train_model():
         adam_beta2 = config.get("adam_beta2", 0.999)
         adam_epsilon = config.get("adam_epsilon", 1e-08)
         max_steps = config.get("max_steps", 5)
+        beta = config.get("beta", 0.04)
+        num_iterations = config.get("num_iterations", 2)
         system_prompt = config.get("system_prompt", "You are a helpful assistant that solves math problems step by step.")
         input_template = config.get("input_template", "{{ question }}")
         output_template = config.get("output_template", "{{ answer }}")
 
         # LLM-as-Judge configuration
         llm_judge_enabled = str(config.get("llm_judge_enabled", False)).lower() in ("true", "1", "yes")
-        llm_judge_server_url = config.get("llm_judge_server_url", "http://localhost:8000/v1")
+        llm_judge_server_url = config.get("llm_judge_server_url", "")
         llm_judge_model_name = config.get("llm_judge_model_name", "")
         llm_judge_prompt = config.get("llm_judge_prompt", (
             "Rate the quality of the following response to the given question.\n"
@@ -244,6 +246,8 @@ def train_model():
                 "adam_beta2": adam_beta2,
                 "adam_epsilon": adam_epsilon,
                 "max_steps": max_steps,
+                "beta": beta,
+                "num_iterations": num_iterations,
                 "device": "cuda" if torch.cuda.is_available() else "cpu",
                 # Template configuration
                 "system_prompt": system_prompt,
@@ -298,6 +302,8 @@ def train_model():
         adam_beta2 = float(training_config["_config"]["adam_beta2"])
         adam_epsilon = float(training_config["_config"]["adam_epsilon"])
         max_steps = int(training_config["_config"]["max_steps"])
+        beta = float(training_config["_config"]["beta"])
+        num_iterations_val = int(training_config["_config"]["num_iterations"])
         output_dir = training_config["output_dir"]
 
         # Template configuration
@@ -434,11 +440,13 @@ def train_model():
 
         # BitsAndBytes configuration
         lab.log("Configuring quantization...")
+        use_bf16 = False
+        compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=True,
             bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_compute_dtype=compute_dtype,
         )
 
         # Load model and tokenizer
@@ -448,6 +456,7 @@ def train_model():
                 model_name=model_id,
                 max_seq_length=max_seq_length,
                 max_lora_rank=lora_rank,
+                dtype=compute_dtype,
                 quantization_config=bnb_config,
                 use_cache=False,
                 device_map="auto"
@@ -494,6 +503,8 @@ def train_model():
             logging_dir=os.path.join(output_dir, f"logs_{run_suffix}"),
             num_train_epochs=num_epochs,
             max_steps=max_steps,
+            beta=beta,
+            num_iterations=num_iterations_val,
             weight_decay=weight_decay,
             per_device_train_batch_size=batch_size,
             num_generations=max(2, batch_size),  # GRPO requires at least 2 generations per prompt
@@ -503,8 +514,8 @@ def train_model():
             logging_steps=10,
             save_strategy="epoch",
             learning_rate=learning_rate,
-            bf16=is_bfloat16_supported(),
-            fp16=not is_bfloat16_supported(),
+            bf16=use_bf16,
+            fp16=not use_bf16,
             tf32=True,
             max_grad_norm=max_grad_norm,
             warmup_ratio=0.03,

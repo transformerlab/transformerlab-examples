@@ -2,8 +2,8 @@ name: unsloth-grpo-train-task
 github_repo_url: https://github.com/transformerlab/transformerlab-examples
 github_repo_dir: unsloth-grpo-train
 resources:
-  accelerators: "A100-80GB:1"
-setup: "uv pip install trl bitsandbytes unsloth transformerlab datasets jinja2"
+  accelerators: "RTX3090:1"
+setup: "uv pip install trl==0.24.0 bitsandbytes==0.49.2 unsloth==2026.3.3 unsloth-zoo==2026.3.1 transformerlab datasets==4.3.0"
 run: "cd ~/unsloth-grpo-train && python train.py"
 envs:
   WANDB_PROJECT: "unsloth-grpo-training"
@@ -36,6 +36,12 @@ parameters:
   adam_beta2: 0.999
   adam_epsilon: 0.00000001
   max_steps: 5
+  beta: 0.04
+  num_iterations: 2
   system_prompt: "You are a helpful assistant that solves math problems step by step."
   input_template: "{{ question }}"
   output_template: "{{ answer }}"
+  llm_judge_enabled: false
+  llm_judge_server_url: "http://localhost:8000/v1"
+  llm_judge_model_name: ""
+  llm_judge_prompt: "Rate the quality of the following response to the given question.\nConsider correctness, clarity, and reasoning quality.\n\nQuestion: {prompt}\n\nResponse: {completion}\n\nScore (respond with ONLY a number between 0.0 and 2.0, where 0.0 is completely wrong and 2.0 is perfect):"

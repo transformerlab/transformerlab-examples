@@ -4,7 +4,7 @@ github_repo_dir: batch-image-gen-flux
 resources:
   accelerators: "RTX3090:1"
 setup: "sudo apt update && sudo apt install -y libopenblas-dev curl && git clone https://github.com/antirez/flux2.c && cd flux2.c && make blas && ./download_model.sh && uv pip install transformerlab"
-run: "cd ~/batch-image-gen-flux && python main.py"
+run: "python ~/batch-image-gen-flux/main.py"
 parameters:
   prompts:
     - "A fluffy orange cat sitting on a windowsill"

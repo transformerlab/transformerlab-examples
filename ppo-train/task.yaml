@@ -1,0 +1,22 @@
+name: ppo-train-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: ppo-train
+resources:
+  accelerators: "RTX3090:1"
+setup: "uv pip install trl==0.26.2 peft trackio kernels accelerate transformers==4.57.3 datasets torch"
+run: "python ~/ppo-train/train.py"
+envs:
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
+parameters:
+  dataset_name: "trl-internal-testing/descriptiveness-sentiment-trl-style"
+  dataset_train_split: "descriptiveness"
+  output_dir: "pythia-1b-deduped-descriptiveness-sentiment-trl-style-ppo"
+  model_name_or_path: "EleutherAI/pythia-1b-deduped"
+  sft_model_path: "EleutherAI/pythia-1b-deduped"
+  reward_model_path: "EleutherAI/pythia-1b-deduped"
+  total_episodes: 10000
+  per_device_train_batch_size: 64
+  gradient_accumulation_steps: 1
+  missing_eos_penalty: 1.0

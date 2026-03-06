@@ -55,15 +55,21 @@ if [ -f "$LOCAL_ENV_FILE" ]; then
   mkdir -p "$TLAB_ENV_DIR"
   touch "$TLAB_ENV_FILE"
 
-  # Detect if ~/.transformerlab/.env has any non-JWT variables
-  has_non_jwt_vars=false
+  # Skip copy only if ~/.transformerlab/.env has any variable other than the two allowed JWT vars
+  skip_copy=false
   if [ -s "$TLAB_ENV_FILE" ]; then
-    if grep -vE '^\s*($|#)' "$TLAB_ENV_FILE" | cut -d= -f1 | grep -Ev 'JWT' >/dev/null 2>&1; then
-      has_non_jwt_vars=true
-    fi
+    while IFS= read -r line; do
+      key="${line%%=*}"
+      key="$(printf '%s' "$key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+      [ -z "$key" ] && continue
+      case "$key" in
+        TRANSFORMERLAB_JWT_SECRET|TRANSFORMERLAB_REFRESH_SECRET) ;;
+        *) skip_copy=true; break ;;
+      esac
+    done < <(grep -vE '^\s*($|#)' "$TLAB_ENV_FILE")
   fi
 
-  if [ "$has_non_jwt_vars" = false ]; then
+  if [ "$skip_copy" = false ]; then
     echo "Merging local .env into $TLAB_ENV_FILE"
     while IFS= read -r line; do
       # skip empty lines
@@ -81,21 +87,24 @@ if [ -f "$LOCAL_ENV_FILE" ]; then
       fi
 
       key="${line%%=*}"
-      if printf '%s\n' "$key" | grep -q 'JWT'; then
-        # Prefer local JWT secrets: remove existing and append local
-        tmp_file="$(mktemp)"
-        grep -v "^${key}=" "$TLAB_ENV_FILE" >"$tmp_file" || true
-        mv "$tmp_file" "$TLAB_ENV_FILE"
-        echo "$line" >>"$TLAB_ENV_FILE"
-      else
-        # Append non-JWT variables only if not already present
-        if ! grep -q "^${key}=" "$TLAB_ENV_FILE"; then
+      case "$key" in
+        TRANSFORMERLAB_JWT_SECRET|TRANSFORMERLAB_REFRESH_SECRET)
+          # Prefer local JWT secrets: remove existing and append local
+          tmp_file="$(mktemp)"
+          grep -v "^${key}=" "$TLAB_ENV_FILE" >"$tmp_file" || true
+          mv "$tmp_file" "$TLAB_ENV_FILE"
           echo "$line" >>"$TLAB_ENV_FILE"
-        fi
-      fi
+          ;;
+        *)
+          # Append other variables only if not already present
+          if ! grep -q "^${key}=" "$TLAB_ENV_FILE"; then
+            echo "$line" >>"$TLAB_ENV_FILE"
+          fi
+          ;;
+      esac
     done <"$LOCAL_ENV_FILE"
   else
-    echo "$TLAB_ENV_FILE contains non-JWT variables; skipping merge from local .env"
+    echo "$TLAB_ENV_FILE contains variables other than TRANSFORMERLAB_JWT_SECRET and TRANSFORMERLAB_REFRESH_SECRET; skipping merge from local .env"
   fi
 
   # Ensure transformerlab-app has the same .env file

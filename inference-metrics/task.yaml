@@ -1,0 +1,10 @@
+name: inference-metrics-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: inference-metrics
+resources:
+  accelerators: "RTX3090:1"
+envs:
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
+setup: "uv pip install GPUtil transformers accelerate huggingface-hub transformerlab && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
+run: "cd ~/inference-metrics && python main.py"

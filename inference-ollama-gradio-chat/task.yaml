@@ -16,7 +16,7 @@ run: |
   ollama pull $MODEL_NAME > /tmp/ollama-pull.log 2>&1 &
   sleep 5
   python -c "import gradio; print('gradio found at:', gradio.__file__)" 2>&1 || echo "gradio NOT found in run python"
-  OLLAMA_BASE_URL=http://127.0.0.1:11434 MODEL_NAME=$MODEL_NAME python ~/ollama-gradio-chat/gradio_chat.py > /tmp/gradio.log 2>&1 &
+  OLLAMA_BASE_URL=http://127.0.0.1:11434 MODEL_NAME=$MODEL_NAME python ~/inference-ollama-gradio-chat/gradio_chat.py > /tmp/gradio.log 2>&1 &
   sleep 5
   tail -f /tmp/ollama.log /tmp/ollama-pull.log /tmp/gradio.log
 envs:

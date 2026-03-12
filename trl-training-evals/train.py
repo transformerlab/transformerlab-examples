@@ -47,7 +47,6 @@ def train_with_trl():
         model_name = config.get("model_name", "HuggingFaceTB/SmolLM-135M-Instruct")
         dataset_name = config.get("dataset", "Trelis/touch-rugby-rules")
         output_dir = config.get("output_dir", "./output")
-        log_to_wandb = config.get("log_to_wandb", True)
         eval_task = config.get("eval_task", "mmlu_abstract_algebra")
 
         # Convert string values to appropriate types (parameters from sweeps may come as strings)

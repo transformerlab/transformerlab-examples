@@ -19,7 +19,8 @@ from lab import lab
 # Login to huggingface
 from huggingface_hub import login
 
-login(token=os.getenv("HF_TOKEN"))
+if os.getenv("HF_TOKEN"):
+    login(token=os.getenv("HF_TOKEN"))
 
 
 def train_with_trl():

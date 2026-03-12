@@ -32,7 +32,6 @@ def train_with_trl():
         log_to_wandb = True
     else:
         log_to_wandb = False
-        lab.log("⚠️  WANDB_API_KEY not found in environment variables. Wandb logging disabled.")
 
     try:
         # Initialize lab (auto-loads parameters from job_data if available)

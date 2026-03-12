@@ -4,12 +4,12 @@ github_repo_dir: nanochat
 resources:
   accelerators: "H100:8"
 setup: "uv pip install transformerlab torch torchvision torchaudio transformers datasets wandb;sudo apt update;sudo apt install -y curl git build-essential;"
-run: "cd ~/nanochat && python train.py"
+run: "python ~/nanochat/train.py"
 envs:
   WANDB_PROJECT: "nanochat-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "<your_huggingface_token_here>"
-  WANDB_API_KEY: "<your_wandb_api_key_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 
 parameters:
   # General Settings

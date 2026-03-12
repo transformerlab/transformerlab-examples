@@ -4,12 +4,12 @@ github_repo_dir: unsloth-llm-train
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install unsloth==2025.12.5 transformers==4.57.3 datasets huggingface-hub torch transformerlab wandb"
-run: "cd ~/unsloth-llm-train && python train.py"
+run: "python ~/unsloth-llm-train/train.py"
 envs:
   WANDB_PROJECT: "unsloth-llm-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "unsloth/Qwen2.5-0.5B-Instruct"
   dataset: "Trelis/touch-rugby-rules"

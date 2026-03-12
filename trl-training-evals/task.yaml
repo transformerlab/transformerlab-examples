@@ -4,12 +4,12 @@ github_repo_dir: trl-training-evals
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install transformerlab datasets transformers==4.57.3 torch pandas trl==0.26.2 wandb lm_eval==0.4.7;sudo apt update;sudo apt install -y libgl1 libglib2.0-0;"
-run: "cd ~/trl-training-evals && python train.py"
+run: "python ~/trl-training-evals/train.py"
 envs:
   WANDB_PROJECT: "trl-training-project"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "<your_huggingface_token_here>"
-  WANDB_API_KEY: "<your_wandb_api_key_here>"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "HuggingFaceTB/SmolLM-135M-Instruct"
   dataset: "Trelis/touch-rugby-rules"

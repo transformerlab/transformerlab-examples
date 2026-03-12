@@ -28,6 +28,11 @@ def train_with_trl():
 
     # Configure GPU usage - use only GPU 0
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    if "WANDB_API_KEY" in os.environ:
+        log_to_wandb = True
+    else:
+        log_to_wandb = False
+        lab.log("⚠️  WANDB_API_KEY not found in environment variables. Wandb logging disabled.")
 
     try:
         # Initialize lab (auto-loads parameters from job_data if available)

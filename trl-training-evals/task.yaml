@@ -16,4 +16,3 @@ parameters:
   eval_task: "mmlu_abstract_algebra"
   num_train_epochs: "1"
   learning_rate: "2e-5"
-  log_to_wandb: "true"

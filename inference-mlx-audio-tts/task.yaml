@@ -1,0 +1,36 @@
+name: mlx-audio-tts
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: inference-mlx-audio-tts
+resources:
+  cpus: 2
+  memory: 4
+setup: |
+  uv pip install gradio "mlx-audio>=0.2.4" "librosa>=0.11.0" sounddevice numpy scipy
+  python -c "import gradio; print('gradio installed at:', gradio.__file__)"
+  python -c "import mlx_audio; print('mlx_audio installed at:', mlx_audio.__file__)"
+run: |
+  MODEL_NAME=$MODEL_NAME VOICE=$VOICE LANG_CODE=$LANG_CODE python ~/inference-mlx-audio-tts/gradio_tts.py
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model_name:
+    field_name: "Model Name"
+    env_var: "MODEL_NAME"
+    field_type: "str"
+    required: true
+    placeholder: "e.g. mlx-community/Kokoro-82M-bf16"
+    help_text: "HuggingFace model identifier for an MLX-compatible TTS model (e.g. mlx-community/Kokoro-82M-bf16, mlx-community/Dia-1.6B-fp16)"
+  voice:
+    field_name: "Default Voice"
+    env_var: "VOICE"
+    field_type: "str"
+    required: false
+    placeholder: "e.g. af_heart"
+    help_text: "Default voice preset (e.g. af_heart, af_bella, am_adam). Leave empty for model default."
+  lang_code:
+    field_name: "Language Code"
+    env_var: "LANG_CODE"
+    field_type: "str"
+    required: false
+    placeholder: "e.g. a"
+    help_text: "Language code: a=American English, b=British English, j=Japanese, z=Chinese, e=Spanish, f=French. Leave empty for model default."

@@ -5,7 +5,7 @@ resources:
   cpus: 2
   memory: 4
 setup: |
-  uv pip install gradio "mlx-audio>=0.2.4" "librosa>=0.11.0" sounddevice numpy scipy
+  uv pip install gradio "mlx-audio>=0.2.4" "librosa>=0.11.0" sounddevice numpy scipy "misaki[en]"
   python -c "import gradio; print('gradio installed at:', gradio.__file__)"
   python -c "import mlx_audio; print('mlx_audio installed at:', mlx_audio.__file__)"
 run: |

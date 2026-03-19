@@ -1,24 +1,61 @@
 import argparse
 import os
 import sys
-import torch
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "Hunyuan3D-2.1", "hy3dshape")
-)
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "Hunyuan3D-2.1", "hy3dpaint")
-)
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+HUNYUAN_ROOT = os.path.join(SCRIPT_DIR, "Hunyuan3D-2.1")
+HY3D_SHAPE_PATH = os.path.join(HUNYUAN_ROOT, "hy3dshape")
+HY3D_PAINT_PATH = os.path.join(HUNYUAN_ROOT, "hy3dpaint")
+DEFAULT_SHAPE_SUBFOLDER = "hunyuan3d-dit-v2-1"
+IMAGE_TO_3D_MODES = {"image2text", "image23d", "image2shape", "image-to-3d"}
+
+sys.path.insert(0, HY3D_SHAPE_PATH)
+sys.path.insert(0, HY3D_PAINT_PATH)
 
 from textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
 from hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
 
 
-def generate_3d_from_image(image_path, output_dir, model_path, low_vram_mode=False):
+def _require_hunyuan_checkout():
+    if not os.path.isdir(HUNYUAN_ROOT):
+        raise FileNotFoundError(
+            f"Hunyuan checkout not found at {HUNYUAN_ROOT}. Run the task setup first."
+        )
+
+
+def _build_paint_config(output_dir):
+    paint_config = Hunyuan3DPaintConfig(max_num_view=6, resolution=512)
+
+    # The upstream paint pipeline expects these paths relative to the Hunyuan repo
+    # root, but this example runs from a wrapper directory.
+    paint_config.multiview_cfg_path = os.path.join(
+        HUNYUAN_ROOT, "hy3dpaint", "cfgs", "hunyuan-paint-pbr.yaml"
+    )
+    paint_config.realesrgan_ckpt_path = os.path.join(
+        HUNYUAN_ROOT, "hy3dpaint", "ckpt", "RealESRGAN_x4plus.pth"
+    )
+    paint_config.custom_pipeline = os.path.join(HUNYUAN_ROOT, "hy3dpaint", "hunyuanpaintpbr")
+
+    return paint_config
+
+
+def generate_3d_from_image(
+    image_path,
+    output_dir,
+    model_path,
+    low_vram_mode=False,
+    shape_subfolder=DEFAULT_SHAPE_SUBFOLDER,
+):
+    del low_vram_mode
+
+    _require_hunyuan_checkout()
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"Loading shape model from {model_path}...")
-    shape_pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(model_path)
+    shape_pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
+        model_path, subfolder=shape_subfolder
+    )
 
     print("Generating 3D shape from image...")
     mesh_untextured = shape_pipeline(image=image_path)[0]
@@ -28,16 +65,17 @@ def generate_3d_from_image(image_path, output_dir, model_path, low_vram_mode=Fal
     print(f"Saved mesh to {mesh_path}")
 
     print("Loading texture model...")
-    paint_config = Hunyuan3DPaintConfig(max_num_view=6, resolution=512)
+    paint_config = _build_paint_config(output_dir)
     paint_pipeline = Hunyuan3DPaintPipeline(paint_config)
 
     print("Generating textures...")
-    mesh_textured = paint_pipeline(mesh_path, image_path=image_path)
+    output_path = paint_pipeline(
+        mesh_path=mesh_path,
+        image_path=image_path,
+        output_mesh_path=os.path.join(output_dir, "textured_mesh.obj"),
+    )
 
-    output_path = os.path.join(output_dir, "textured_mesh.obj")
-    mesh_textured.export(output_path)
     print(f"Saved textured 3D model to {output_path}")
-
     return output_path
 
 
@@ -46,8 +84,8 @@ def main():
     parser.add_argument(
         "--mode",
         type=str,
-        default="image23d",
-        choices=["image2text", "image2text", "image2text", "text2text"],
+        default="image2text",
+        choices=sorted(IMAGE_TO_3D_MODES | {"text2text"}),
         help="Generation mode",
     )
     parser.add_argument(
@@ -63,12 +101,18 @@ def main():
         help="HuggingFace model path",
     )
     parser.add_argument(
+        "--shape_subfolder",
+        type=str,
+        default=DEFAULT_SHAPE_SUBFOLDER,
+        help="Shape model subfolder inside the HuggingFace repository",
+    )
+    parser.add_argument(
         "--low_vram_mode", action="store_true", help="Enable low VRAM mode"
     )
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.input) and args.mode == "image2text":
+    if not os.path.exists(args.input) and args.mode in IMAGE_TO_3D_MODES:
         print(f"Error: Input file not found: {args.input}")
         sys.exit(1)
 
@@ -76,9 +120,13 @@ def main():
     print(f"Input: {args.input}")
     print(f"Output: {args.output}")
 
-    if args.mode in ["image2text", "image2text", "image2text"]:
+    if args.mode in IMAGE_TO_3D_MODES:
         output_path = generate_3d_from_image(
-            args.input, args.output, args.model_path, args.low_vram_mode
+            args.input,
+            args.output,
+            args.model_path,
+            args.low_vram_mode,
+            args.shape_subfolder,
         )
     else:
         print("Text-to-3D mode not yet implemented in this script")

@@ -1,17 +1,29 @@
 """Gradio text-to-speech interface backed by MLX Audio."""
 
-import io
 import os
-import sys
-import tempfile
 import time
 
 import gradio as gr
 import numpy as np
 
 MODEL_NAME = os.environ.get("MODEL_NAME", "mlx-community/Kokoro-82M-bf16")
-DEFAULT_VOICE = os.environ.get("VOICE", "af_heart")
-DEFAULT_LANG_CODE = os.environ.get("LANG_CODE", "a")
+DEFAULT_VOICE = os.environ.get("VOICE", "") or "af_heart"
+DEFAULT_LANG_CODE = os.environ.get("LANG_CODE", "") or "a"
+
+VALID_LANG_CODES = {"a", "b", "e", "f", "h", "i", "j", "p", "z"}
+
+# ---------------------------------------------------------------------------
+# Fix espeak-ng data path: phonemizer-fork has the CI build path baked in,
+# so we point it at the correct location from the espeakng_loader package.
+# ---------------------------------------------------------------------------
+try:
+    import espeakng_loader
+    _espeak_data = espeakng_loader.get_data_path()
+    os.environ.setdefault("PHONEMIZER_ESPEAK_PATH", _espeak_data)
+    os.environ.setdefault("ESPEAK_DATA_PATH", _espeak_data)
+    espeakng_loader.make_library_available()
+except Exception:
+    pass  # espeak not available; will surface later if needed
 
 # ---------------------------------------------------------------------------
 # Model loading
@@ -38,8 +50,15 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
     if not text or not text.strip():
         raise gr.Error("Please enter some text to synthesize.")
 
-    voice = voice.strip() if voice and voice.strip() else DEFAULT_VOICE
-    lang_code = lang_code.strip() if lang_code and lang_code.strip() else DEFAULT_LANG_CODE
+    voice = (voice or "").strip() or DEFAULT_VOICE
+    lang_code = (lang_code or "").strip() or DEFAULT_LANG_CODE
+
+    if lang_code not in VALID_LANG_CODES:
+        raise gr.Error(
+            f"Invalid language code '{lang_code}'. "
+            f"Choose one of: a=American English, b=British English, "
+            f"e=Spanish, f=French, h=Hindi, i=Italian, j=Japanese, p=Portuguese, z=Mandarin Chinese."
+        )
 
     gen_kwargs = dict(
         text=text,
@@ -52,11 +71,19 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
     print(f"[TTS] Generating: text={text!r}, voice={voice}, speed={speed}, lang={lang_code}")
     t0 = time.time()
 
-    audio_segments = []
-    for result in model.generate(**gen_kwargs):
-        # result.audio is an mx.array – convert to numpy
-        audio_np = np.array(result.audio, copy=False)
-        audio_segments.append(audio_np)
+    try:
+        audio_segments = []
+        for result in model.generate(**gen_kwargs):
+            # result.audio is an mx.array – convert to numpy
+            audio_np = np.array(result.audio, copy=False)
+            audio_segments.append(audio_np)
+    except AssertionError as e:
+        raise gr.Error(
+            f"Generation failed — invalid voice or language code. "
+            f"Details: {e}"
+        ) from e
+    except Exception as e:
+        raise gr.Error(f"Generation failed: {e}") from e
 
     if not audio_segments:
         raise gr.Error("No audio was generated. Please try different text or settings.")
@@ -90,7 +117,7 @@ LANG_CODES = {
     "f": "French",
 }
 
-with gr.Blocks(title="MLX Audio TTS", theme=gr.themes.Soft()) as demo:
+with gr.Blocks(title="MLX Audio TTS") as demo:
     gr.Markdown(
         f"# 🔊 MLX Audio — Text-to-Speech\n"
         f"Model: **{MODEL_NAME}**"
@@ -134,15 +161,6 @@ with gr.Blocks(title="MLX Audio TTS", theme=gr.themes.Soft()) as demo:
         outputs=audio_output,
     )
 
-    gr.Examples(
-        examples=[
-            ["Hello! Welcome to Transformer Lab. This is a text-to-speech demo powered by MLX Audio on Apple Silicon.", DEFAULT_VOICE, 1.0, DEFAULT_LANG_CODE],
-            ["The quick brown fox jumps over the lazy dog.", "af_bella", 1.0, "a"],
-            ["Science is not only a disciple of reason but also one of romance and passion.", "am_adam", 0.9, "a"],
-        ],
-        inputs=[text_input, voice_input, speed_input, lang_input],
-    )
-
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7860, theme=gr.themes.Soft())

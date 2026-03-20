@@ -25,10 +25,6 @@ VALID_LANG_CODES = {
 }
 
 
-# ---------------------------------------------------------------------------
-# TTS generation helper
-# ---------------------------------------------------------------------------
-
 def synthesize(text: str, voice: str, speed: float, lang_code: str):
     """Shell out to mlx_audio.tts.generate and return the output WAV path."""
     if not text or not text.strip():
@@ -45,8 +41,14 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
 
     output_dir = tempfile.mkdtemp()
 
+    # --- Resolve venv Python (same pattern as mlx_lora trainer) ---
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(script_dir)
+    venv_python = os.path.join(parent_dir, "venv", "bin", "python")
+    python_executable = venv_python if os.path.exists(venv_python) else sys.executable
+
     cmd = [
-        sys.executable, "-m", "mlx_audio.tts.generate",
+        python_executable, "-m", "mlx_audio.tts.generate",
         "--model", MODEL_NAME,
         "--text", text,
         "--voice", voice,
@@ -56,10 +58,23 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
         "--file_prefix", "output",
     ]
 
+    # --- Inject espeak-ng paths into subprocess env ---
+    env = os.environ.copy()
+    for prefix in ["/opt/homebrew", "/usr/local"]:  # Apple Silicon, then Intel
+        espeak_data = os.path.join(prefix, "lib", "espeak-ng-data")
+        espeak_bin = os.path.join(prefix, "bin", "espeak-ng")
+        if os.path.exists(espeak_data):
+            env["ESPEAK_DATA_PATH"] = espeak_data
+            env["PHONEMIZER_ESPEAK_PATH"] = espeak_bin
+            print(f"[TTS] espeak-ng found at: {prefix}")
+            break
+    else:
+        print("[TTS] Warning: espeak-ng not found in /opt/homebrew or /usr/local")
+
     print(f"[TTS] Running: {' '.join(cmd)}")
     t0 = time.time()
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
     if result.stdout:
         print(result.stdout)
@@ -69,7 +84,6 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
     if result.returncode != 0:
         raise gr.Error(f"Generation failed:\n{result.stderr or result.stdout}")
 
-    # Find the generated file — mlx_audio writes output_<timestamp>.wav
     wav_files = sorted(
         [f for f in os.listdir(output_dir) if f.endswith(".wav")],
         key=lambda f: os.path.getmtime(os.path.join(output_dir, f)),
@@ -143,4 +157,3 @@ with gr.Blocks(title="MLX Audio TTS") as demo:
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860, theme=gr.themes.Soft())
-

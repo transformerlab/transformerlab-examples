@@ -55,7 +55,6 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
         "--voice", voice,
         "--speed", str(speed),
         "--lang_code", lang_code,
-        "--output_path", output_dir,
         "--file_prefix", "output",
     ]
 

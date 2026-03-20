@@ -8,6 +8,18 @@ import time
 
 import gradio as gr
 
+# --- Ensure espeak-ng data path is set for all subprocesses ---
+if not os.environ.get("ESPEAK_DATA_PATH"):
+    brew_prefix = subprocess.run(
+        ["brew", "--prefix", "espeak-ng"],
+        capture_output=True, text=True
+    )
+    if brew_prefix.returncode == 0:
+        espeak_data = os.path.join(brew_prefix.stdout.strip(), "share", "espeak-ng-data")
+        if os.path.isdir(espeak_data):
+            os.environ["ESPEAK_DATA_PATH"] = espeak_data
+            print(f"[TTS] Set ESPEAK_DATA_PATH={espeak_data}")
+
 MODEL_NAME = os.environ.get("MODEL_NAME", "mlx-community/Kokoro-82M-bf16")
 DEFAULT_VOICE = os.environ.get("VOICE", "") or "af_heart"
 DEFAULT_LANG_CODE = os.environ.get("LANG_CODE", "") or "a"
@@ -58,10 +70,14 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
         "--file_prefix", "output",
     ]
 
+    # Build env with ESPEAK_DATA_PATH guaranteed
+    env = os.environ.copy()
+
     print(f"[TTS] Running: {' '.join(cmd)}")
+    print(f"[TTS] ESPEAK_DATA_PATH={env.get('ESPEAK_DATA_PATH', '(not set)')}")
     t0 = time.time()
 
-    result = subprocess.run(cmd, capture_output=True, text=True, env=os.environ.copy())
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
 
     if result.stdout:
         print(result.stdout)

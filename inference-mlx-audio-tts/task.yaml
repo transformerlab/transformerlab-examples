@@ -1,0 +1,28 @@
+name: mlx-audio-tts
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: inference-mlx-audio-tts
+resources:
+  cpus: 2
+  memory: 4
+setup: |
+  brew install espeak-ng
+  echo "export ESPEAK_DATA_PATH=$(brew --prefix espeak-ng)/lib/espeak-ng-data" >> ~/.bashrc
+  echo "export PHONEMIZER_ESPEAK_PATH=$(brew --prefix espeak-ng)/bin/espeak-ng" >> ~/.bashrc
+  uv pip install gradio mlx-audio "librosa>=0.11.0" sounddevice numpy scipy "misaki[en]"
+  python -c "import gradio; print('gradio installed at:', gradio.__file__)"
+  python -c "import mlx_audio; print('mlx_audio installed at:', mlx_audio.__file__)"
+run: |
+  ESPEAK_DATA_PATH=$(brew --prefix espeak-ng)/lib/espeak-ng-data \
+  PHONEMIZER_ESPEAK_PATH=$(brew --prefix espeak-ng)/bin/espeak-ng \
+  MODEL_NAME=$MODEL_NAME VOICE=$VOICE LANG_CODE=$LANG_CODE \
+  python ~/inference-mlx-audio-tts/gradio_tts.py
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model_name:
+    field_name: "Model Name"
+    env_var: "MODEL_NAME"
+    field_type: "str"
+    required: true
+    placeholder: "e.g. mlx-community/Kokoro-82M-bf16"
+    help_text: "HuggingFace model identifier for an MLX-compatible TTS model (e.g. mlx-community/Kokoro-82M-bf16, mlx-community/Dia-1.6B-fp16)"

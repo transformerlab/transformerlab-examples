@@ -6,10 +6,12 @@ resources:
   memory: 4
 setup: |
   brew install espeak-ng
-  uv pip install gradio mlx-audio "librosa>=0.11.0" sounddevice numpy scipy "misaki[en]"
+  uv pip install "mlx-audio==0.2.10" gradio "librosa>=0.11.0" sounddevice numpy scipy
+  uv pip install pip
   python -c "import gradio; print('gradio installed at:', gradio.__file__)"
   python -c "import mlx_audio; print('mlx_audio installed at:', mlx_audio.__file__)"
 run: |
+  export ESPEAK_DATA_PATH="$(brew --prefix espeak-ng)/share/espeak-ng-data"
   MODEL_NAME=$MODEL_NAME VOICE=$VOICE LANG_CODE=$LANG_CODE \
   python ~/inference-mlx-audio-tts/gradio_tts.py
 envs:

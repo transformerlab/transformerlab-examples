@@ -39,10 +39,11 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
             f"Choose one of: " + ", ".join(f"{k}={v}" for k, v in VALID_LANG_CODES.items())
         )
 
-    output_dir = tempfile.mkdtemp()
-
-    # --- Resolve venv Python (same pattern as mlx_lora trainer) ---
+    # Output audio next to this script
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_dir = script_dir
+
+    # --- Resolve venv Python ---
     parent_dir = os.path.dirname(script_dir)
     venv_python = os.path.join(parent_dir, "venv", "bin", "python")
     python_executable = venv_python if os.path.exists(venv_python) else sys.executable
@@ -58,42 +59,10 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
         "--file_prefix", "output",
     ]
 
-    # --- Inject espeak-ng paths into subprocess env ---
-    env = os.environ.copy()
-    espeak_found = False
-    for prefix in ["/opt/homebrew", "/usr/local"]:
-        # Check standard lib path first
-        espeak_data = os.path.join(prefix, "lib", "espeak-ng-data")
-        espeak_bin = os.path.join(prefix, "bin", "espeak-ng")
-        if os.path.exists(espeak_data):
-            env["ESPEAK_DATA_PATH"] = espeak_data
-            env["PHONEMIZER_ESPEAK_PATH"] = espeak_bin
-            print(f"[TTS] espeak-ng found at: {prefix}")
-            espeak_found = True
-            break
-
-        # Fall back to Cellar (versioned install path)
-        cellar_base = os.path.join(prefix, "Cellar", "espeak-ng")
-        if os.path.isdir(cellar_base):
-            versions = sorted(os.listdir(cellar_base), reverse=True)
-            if versions:
-                versioned = os.path.join(cellar_base, versions[0])
-                espeak_data = os.path.join(versioned, "lib", "espeak-ng-data")
-                espeak_bin = os.path.join(versioned, "bin", "espeak-ng")
-                if os.path.exists(espeak_data):
-                    env["ESPEAK_DATA_PATH"] = espeak_data
-                    env["PHONEMIZER_ESPEAK_PATH"] = espeak_bin
-                    print(f"[TTS] espeak-ng found in Cellar at: {versioned}")
-                    espeak_found = True
-                    break
-
-    if not espeak_found:
-        print("[TTS] Warning: espeak-ng not found in /opt/homebrew or /usr/local")
-
     print(f"[TTS] Running: {' '.join(cmd)}")
     t0 = time.time()
 
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    result = subprocess.run(cmd, capture_output=True, text=True, env=os.environ.copy())
 
     if result.stdout:
         print(result.stdout)

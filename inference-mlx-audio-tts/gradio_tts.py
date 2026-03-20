@@ -75,9 +75,11 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
 
     print(f"[TTS] Running: {' '.join(cmd)}")
     print(f"[TTS] ESPEAK_DATA_PATH={env.get('ESPEAK_DATA_PATH', '(not set)')}")
+    print(f"[TTS] Output directory: {output_dir}")
     t0 = time.time()
 
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    # Run from the output directory so files are created there
+    result = subprocess.run(cmd, capture_output=True, text=True, env=env, cwd=output_dir)
 
     if result.stdout:
         print(result.stdout)
@@ -87,11 +89,17 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
     if result.returncode != 0:
         raise gr.Error(f"Generation failed:\n{result.stderr or result.stdout}")
 
+    # Add a small delay to ensure file is written
+    time.sleep(0.5)
+
     wav_files = sorted(
         [f for f in os.listdir(output_dir) if f.endswith(".wav")],
         key=lambda f: os.path.getmtime(os.path.join(output_dir, f)),
         reverse=True,
     )
+    
+    print(f"[TTS] WAV files found: {wav_files}")
+    
     if not wav_files:
         raise gr.Error("No audio file was generated. Check the model and settings.")
 

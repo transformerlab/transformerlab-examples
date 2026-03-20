@@ -60,15 +60,34 @@ def synthesize(text: str, voice: str, speed: float, lang_code: str):
 
     # --- Inject espeak-ng paths into subprocess env ---
     env = os.environ.copy()
-    for prefix in ["/opt/homebrew", "/usr/local"]:  # Apple Silicon, then Intel
+    espeak_found = False
+    for prefix in ["/opt/homebrew", "/usr/local"]:
+        # Check standard lib path first
         espeak_data = os.path.join(prefix, "lib", "espeak-ng-data")
         espeak_bin = os.path.join(prefix, "bin", "espeak-ng")
         if os.path.exists(espeak_data):
             env["ESPEAK_DATA_PATH"] = espeak_data
             env["PHONEMIZER_ESPEAK_PATH"] = espeak_bin
             print(f"[TTS] espeak-ng found at: {prefix}")
+            espeak_found = True
             break
-    else:
+
+        # Fall back to Cellar (versioned install path)
+        cellar_base = os.path.join(prefix, "Cellar", "espeak-ng")
+        if os.path.isdir(cellar_base):
+            versions = sorted(os.listdir(cellar_base), reverse=True)
+            if versions:
+                versioned = os.path.join(cellar_base, versions[0])
+                espeak_data = os.path.join(versioned, "lib", "espeak-ng-data")
+                espeak_bin = os.path.join(versioned, "bin", "espeak-ng")
+                if os.path.exists(espeak_data):
+                    env["ESPEAK_DATA_PATH"] = espeak_data
+                    env["PHONEMIZER_ESPEAK_PATH"] = espeak_bin
+                    print(f"[TTS] espeak-ng found in Cellar at: {versioned}")
+                    espeak_found = True
+                    break
+
+    if not espeak_found:
         print("[TTS] Warning: espeak-ng not found in /opt/homebrew or /usr/local")
 
     print(f"[TTS] Running: {' '.join(cmd)}")

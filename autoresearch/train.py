@@ -19,6 +19,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from kernels import get_kernel
+from prepare import MAX_SEQ_LEN, TIME_BUDGET, Tokenizer, make_dataloader, evaluate_bpb
 
 cap = torch.cuda.get_device_capability()
 repo = (
@@ -26,7 +27,6 @@ repo = (
 )
 fa3 = get_kernel(repo).flash_attn_interface
 
-from prepare import MAX_SEQ_LEN, TIME_BUDGET, Tokenizer, make_dataloader, evaluate_bpb
 
 
 @dataclass

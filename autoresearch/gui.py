@@ -1,8 +1,3 @@
-"""
-Litesearch GUI — CustomTkinter dashboard for consumer GPU research.
-Usage: python gui.py
-"""
-
 import os
 import threading
 import queue

@@ -1,8 +1,10 @@
 name: autoresearch-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: autoresearch
 resources:
   accelerators: "RTX3090:1"
-setup: "git clone --branch add/autoresearch-task --single-branch https://github.com/transformerlab/transformerlab-examples.git ~/transformerlab-examples && cd ~/transformerlab-examples && python -m pip install --upgrade pip && python -m pip install kernels==0.11.7 ddtrace matplotlib numpy pandas pyarrow requests rustbpe tiktoken torch==2.9.1 transformers huggingface_hub"
-run: "cd ~/transformerlab-examples && python prepare.py --num-shards 10 && python -m autoresearch.train"
+setup: "python -m pip install --upgrade pip && python -m pip install kernels==0.11.7 ddtrace matplotlib numpy pandas pyarrow requests rustbpe tiktoken torch==2.9.1 transformers huggingface_hub"
+run: "python ~/autoresearch/prepare.py --num-shards 10 && python ~/autoresearch/train.py"
 envs:
   PYTHONUNBUFFERED: "1"
   HF_HUB_DISABLE_PROGRESS_BARS: "1"

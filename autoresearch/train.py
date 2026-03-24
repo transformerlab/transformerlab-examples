@@ -11,6 +11,7 @@ Usage:
 import os
 
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:128"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
 import gc
@@ -718,23 +719,25 @@ def run_training(config=None, lr_override=None, log_queue=None, stop_event=None)
     vocab_size = tokenizer.get_vocab_size()
     log(f"Vocab size: {vocab_size:,}")
 
-    if config is not None:
-        depth = config["depth"]
-        n_embd = config["n_embd"]
-        n_head = config["n_head"]
-        n_kv_head = config["n_kv_head"]
-        device_batch_size = config["device_batch_size"]
-        max_seq_len = config["max_seq_len"]
-        total_batch_size = config["total_batch_size"]
-    else:
-        depth = DEPTH
-        device_batch_size = DEVICE_BATCH_SIZE
-        max_seq_len = MAX_SEQ_LEN
-        total_batch_size = TOTAL_BATCH_SIZE
-        base_dim = depth * ASPECT_RATIO
-        n_embd = ((base_dim + HEAD_DIM - 1) // HEAD_DIM) * HEAD_DIM
-        n_head = n_embd // HEAD_DIM
-        n_kv_head = n_head
+    # If user didn't pass a config, auto-compute one from GPU VRAM and vocab size.
+    if config is None:
+        try:
+            auto_cfg = compute_optimal_config(vram_total_mb, use_bf16, vocab_size)
+            log("Auto-config computed from device VRAM")
+            log(
+                f"  depth={auto_cfg['depth']}, n_embd={auto_cfg['n_embd']}, device_B={auto_cfg['device_batch_size']}, T={auto_cfg['max_seq_len']}"
+            )
+            config = auto_cfg
+        except Exception as e:
+            log(f"Auto-config failed ({e}), falling back to defaults")
+
+    depth = config["depth"]
+    n_embd = config["n_embd"]
+    n_head = config.get("n_head", n_embd // HEAD_DIM)
+    n_kv_head = config.get("n_kv_head", n_head)
+    device_batch_size = config["device_batch_size"]
+    max_seq_len = config["max_seq_len"]
+    total_batch_size = config.get("total_batch_size", TOTAL_BATCH_SIZE)
 
     matrix_lr = lr_override if lr_override is not None else MATRIX_LR
 

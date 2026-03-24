@@ -23,16 +23,16 @@ import rustbpe
 import tiktoken
 import torch
 
-MAX_SEQ_LEN = 2048
-TIME_BUDGET = 300
-EVAL_TOKENS = 40 * 524288
+MAX_SEQ_LEN = 2048  # context length
+TIME_BUDGET = 300  # training time budget in seconds (5 minutes)
+EVAL_TOKENS = 40 * 524288  # number of tokens for val eval
 
 CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "autoresearch")
 DATA_DIR = os.path.join(CACHE_DIR, "data")
 TOKENIZER_DIR = os.path.join(CACHE_DIR, "tokenizer")
 BASE_URL = "https://huggingface.co/datasets/karpathy/climbmix-400b-shuffle/resolve/main"
-MAX_SHARD = 6542
-VAL_SHARD = MAX_SHARD
+MAX_SHARD = 6542  # the last datashard is shard_06542.parquet
+VAL_SHARD = MAX_SHARD  # pinned validation shard (shard_06542)
 VAL_FILENAME = f"shard_{VAL_SHARD:05d}.parquet"
 VOCAB_SIZE = 8192
 
@@ -43,6 +43,7 @@ BOS_TOKEN = "<|reserved_0|>"
 
 
 def download_single_shard(index):
+    """Download one parquet shard with retries. Returns True on success."""
     filename = f"shard_{index:05d}.parquet"
     filepath = os.path.join(DATA_DIR, filename)
     if os.path.exists(filepath):
@@ -190,6 +191,8 @@ def train_tokenizer():
 
 
 class Tokenizer:
+    """Minimal tokenizer wrapper. Training is handled above."""
+
     def __init__(self, enc):
         self.enc = enc
         self.bos_token_id = enc.encode_single_token(BOS_TOKEN)
@@ -258,6 +261,12 @@ def _document_batches(split, tokenizer_batch_size=128):
 
 
 def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
+    """
+    BOS-aligned dataloader with best-fit packing.
+    Every row starts with BOS. Documents packed using best-fit to minimize cropping.
+    When no document fits remaining space, crops shortest doc to fill exactly.
+    100% utilization (no padding).
+    """
     assert split in ["train", "val"]
     row_capacity = T + 1
     batches = _document_batches(split)
@@ -273,7 +282,8 @@ def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
 
     row_buffer = torch.empty((B, row_capacity), dtype=torch.long)
     cpu_buffer = torch.empty(2 * B * T, dtype=torch.long, pin_memory=True)
-    gpu_buffer = torch.empty(2 * B * T, dtype=torch.long, device="cuda")
+    _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    gpu_buffer = torch.empty(2 * B * T, dtype=torch.long, device=_device)
     cpu_inputs = cpu_buffer[: B * T].view(B, T)
     cpu_targets = cpu_buffer[B * T :].view(B, T)
     inputs = gpu_buffer[: B * T].view(B, T)
@@ -288,6 +298,7 @@ def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
 
                 remaining = row_capacity - pos
 
+                # Find largest doc that fits entirely
                 best_idx = -1
                 best_len = 0
                 for i, doc in enumerate(doc_buffer):
@@ -320,7 +331,15 @@ def make_dataloader(tokenizer, B, T, split, buffer_size=1000):
 
 @torch.no_grad()
 def evaluate_bpb(model, tokenizer, batch_size):
-    token_bytes = get_token_bytes(device="cuda")
+    """
+    Bits per byte (BPB): vocab size-independent evaluation metric.
+    Sums per-token cross-entropy (in nats), sums target byte lengths,
+    then converts nats/byte to bits/byte. Special tokens (byte length 0)
+    are excluded from both sums.
+    Uses fixed MAX_SEQ_LEN so results are comparable across configs.
+    """
+    _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    token_bytes = get_token_bytes(device=_device)
     val_loader = make_dataloader(tokenizer, batch_size, MAX_SEQ_LEN, "val")
     steps = EVAL_TOKENS // (batch_size * MAX_SEQ_LEN)
     total_nats = 0.0

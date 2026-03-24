@@ -12,7 +12,7 @@ To set up a new experiment, work with the user to:
    - `README.md` — repository context.
    - `prepare.py` — fixed constants, data prep, tokenizer, dataloader, evaluation. Do not modify.
    - `train.py` — the file you modify. Model architecture, optimizer, training loop.
-4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data shards and a tokenizer. If not, tell the human to run `uv run prepare.py`.
+4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data shards and a tokenizer. If not, tell the human to run `python prepare.py`.
 5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
 6. **Confirm and go**: Confirm setup looks good.
 
@@ -20,7 +20,7 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `python train.py`.
 
 **What you CAN do:**
 - Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
@@ -96,7 +96,7 @@ LOOP FOREVER:
 1. Look at the git state: the current branch/commit we're on
 2. Tune `train.py` with an experimental idea by directly hacking the code.
 3. git commit
-4. Run the experiment: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
+4. Run the experiment: `python train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
 5. Read out the results: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
 6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
 7. Record the results in the tsv (NOTE: do not commit the results.tsv file, leave it untracked by git)
@@ -112,3 +112,53 @@ The idea is that you are a completely autonomous researcher trying things out. I
 **NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
 
 As an example use case, a user might leave you running while they sleep. If each experiment takes you ~5 minutes then you can run approx 12/hour, for a total of about 100 over the duration of the average human sleep. The user then wakes up to experimental results, all completed by you while they slept!
+
+## Exporting models
+
+After training, export the model as a `.pth` file containing weights + config:
+
+```bash
+# Train and export immediately
+python train.py --export model.pth
+
+# Train and export to a directory (auto-named)
+python train.py --export-dir exports/
+```
+
+The exported `.pth` file contains:
+- `state_dict` — model weights
+- `config` — model architecture (depth, n_embd, heads, vocab_size, etc.)
+- `use_bf16` — whether the model uses bfloat16
+
+To load an exported model:
+
+```python
+import torch
+from train import GPT, GPTConfig
+
+data = torch.load('model.pth', weights_only=False)
+config = GPTConfig(**data['config'])
+model = GPT(config)
+model.load_state_dict(data['state_dict'])
+```
+
+## Agent workflow
+
+For AI agents (Claude Code, Codex, etc.) automating experiments:
+
+```bash
+# Run 10 experiments, export best model
+for i in $(seq 1 10); do
+    python train.py --export-dir exports/ >> run.log 2>&1
+    val_bpb=$(grep "^val_bpb:" run.log | tail -1 | awk '{print $2}')
+    echo "Run $i: val_bpb=$val_bpb"
+done
+```
+
+Agents can also:
+- Edit `train.py` between runs to try different architectures
+- Compare `val_bpb` across runs to find the best config
+- Export every N runs using `--export-dir`
+- Chain with HuggingFace Hub upload: `huggingface-cli upload model.pth`
+
+The `--export` and `--export-dir` flags are safe to combine with any other training modifications.

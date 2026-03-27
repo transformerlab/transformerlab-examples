@@ -1,0 +1,11 @@
+base_model: HuggingFaceTB/SmolLM-135M
+dtype: float16
+merge_method: linear
+models:
+- model: HuggingFaceTB/SmolLM-135M
+  parameters:
+    weight: 0.5
+- model: HuggingFaceTB/SmolLM-135M-Instruct
+  parameters:
+    weight: 0.5
+tokenizer_source: union

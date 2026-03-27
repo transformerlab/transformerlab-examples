@@ -1,6 +1,5 @@
 name: unsloth-tts
-github_repo_url: https://github.com/transformerlab/transformerlab-examples
-github_repo_dir: inference-unsloth-tts
+description: "Text-to-Speech using Unsloth (CSM / Orpheus) with Gradio UI via ngrok tunnel for GPU servers"
 resources:
   cpus: 4
   memory: 16
@@ -8,15 +7,20 @@ resources:
 setup: |
   if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-  uv pip install gradio soundfile librosa torch transformers
-  uv pip install unsloth snac
+  uv venv ~/unsloth-tts-venv --seed --python 3.11
+  . ~/unsloth-tts-venv/bin/activate
+  uv pip install gradio soundfile librosa torch transformers unsloth snac
+  curl -fsSL -o ~/gradio_tts.py https://raw.githubusercontent.com/transformerlab/transformerlab-examples/main/inference-unsloth-tts/gradio_tts.py
   python -c "import gradio; print('gradio installed at:', gradio.__file__)"
   python -c "import torch; print('torch version:', torch.__version__, 'CUDA available:', torch.cuda.is_available())"
 run: |
+  . ~/unsloth-tts-venv/bin/activate
   MODEL_NAME=$MODEL_NAME \
   MODEL_ARCHITECTURE=$MODEL_ARCHITECTURE \
   VOICE=$VOICE \
-  python ~/inference-unsloth-tts/gradio_tts.py
+  python ~/gradio_tts.py > /tmp/gradio-tts.log 2>&1 &
+  sleep 10
+  tail -f /tmp/gradio-tts.log
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

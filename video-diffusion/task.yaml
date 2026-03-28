@@ -2,9 +2,9 @@ name: video-generation-wan-task
 github_repo_url: https://github.com/transformerlab/transformerlab-examples
 github_repo_dir: video-diffusion
 resources:
-  accelerators: "RTX3090:1"
+  accelerators: "A100:1"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-setup: "uv pip install transformerlab accelerate transformers diffusers ftfy huggingface-hub opencv-python && uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126"
-run: "cd ~/video-diffusion && python main.py"
+  HF_TOKEN: "ENTER_HF_TOKEN_HERE"
+setup: "uv pip install --upgrade pip && uv pip install git+https://github.com/huggingface/diffusers.git && uv pip install 'transformers>=4.41.0' 'peft>=0.17.0' accelerate ftfy huggingface-hub opencv-python transformerlab imageio-ffmpeg"
+run: "python workspace/video-diffusion/main.py"

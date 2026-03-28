@@ -5,7 +5,7 @@ resources:
   cpus: 2
   memory: 4
 setup: |
-  uv pip install gradio openai
+  uv pip install --upgrade gradio openai
   python -c "import gradio; print('gradio installed at:', gradio.__file__)"
   if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
   if [ "$(uname)" != "Darwin" ]; then $SUDO apt-get update && $SUDO apt-get install -y pciutils lshw; fi
@@ -18,7 +18,7 @@ run: |
   python -c "import gradio; print('gradio found at:', gradio.__file__)" 2>&1 || echo "gradio NOT found in run python"
   OLLAMA_BASE_URL=http://127.0.0.1:11434 MODEL_NAME=$MODEL_NAME python ~/inference-ollama-gradio-chat/gradio_chat.py > /tmp/gradio.log 2>&1 &
   sleep 5
-  tail -f /tmp/ollama.log /tmp/ollama-pull.log /tmp/gradio.log
+  tail -f /tmp/ollama.log /tmp/ollama-pull.log /tmp/gradio.log /tmp/ngrok.log
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

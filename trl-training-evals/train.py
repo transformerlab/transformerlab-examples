@@ -19,7 +19,8 @@ from lab import lab
 # Login to huggingface
 from huggingface_hub import login
 
-login(token=os.getenv("HF_TOKEN"))
+if os.getenv("HF_TOKEN"):
+    login(token=os.getenv("HF_TOKEN"))
 
 
 def train_with_trl():
@@ -27,6 +28,10 @@ def train_with_trl():
 
     # Configure GPU usage - use only GPU 0
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    if "WANDB_API_KEY" in os.environ:
+        log_to_wandb = True
+    else:
+        log_to_wandb = False
 
     try:
         # Initialize lab (auto-loads parameters from job_data if available)
@@ -41,7 +46,6 @@ def train_with_trl():
         model_name = config.get("model_name", "HuggingFaceTB/SmolLM-135M-Instruct")
         dataset_name = config.get("dataset", "Trelis/touch-rugby-rules")
         output_dir = config.get("output_dir", "./output")
-        log_to_wandb = config.get("log_to_wandb", True)
         eval_task = config.get("eval_task", "mmlu_abstract_algebra")
 
         # Convert string values to appropriate types (parameters from sweeps may come as strings)
@@ -50,17 +54,17 @@ def train_with_trl():
             float(learning_rate_raw) if isinstance(learning_rate_raw, (str, int, float)) else learning_rate_raw
         )
 
-        batch_size_raw = config.get("batch_size", 2)
+        batch_size_raw = int(config.get("batch_size", 2))
         batch_size = int(batch_size_raw) if isinstance(batch_size_raw, (str, int, float)) else batch_size_raw
 
-        num_train_epochs = config.get("num_train_epochs", 1)
-        gradient_accumulation_steps = config.get("gradient_accumulation_steps", 1)
-        warmup_ratio = config.get("warmup_ratio", 0.03)
-        weight_decay = config.get("weight_decay", 0.01)
-        logging_steps = config.get("logging_steps", 1)
-        save_steps = config.get("save_steps", 100)
-        eval_steps = config.get("eval_steps", 100)
-        max_steps = config.get("max_steps", -1)
+        num_train_epochs = int(config.get("num_train_epochs", 1))
+        gradient_accumulation_steps = int(config.get("gradient_accumulation_steps", 1))
+        warmup_ratio = float(config.get("warmup_ratio", 0.03))
+        weight_decay = float(config.get("weight_decay", 0.01))
+        logging_steps = int(config.get("logging_steps", 1))
+        save_steps = int(config.get("save_steps", 100))
+        eval_steps = int(config.get("eval_steps", 100))
+        max_steps = int(config.get("max_steps", -1))
 
         # Check if we should resume from a checkpoint
         checkpoint = lab.get_checkpoint_to_resume()

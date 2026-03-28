@@ -1,0 +1,47 @@
+name: unsloth-tts
+description: "Text-to-Speech using Unsloth (CSM / Orpheus) with Gradio UI via ngrok tunnel for GPU servers"
+resources:
+  cpus: 4
+  memory: 16
+  accelerators: "RTX3090:1"
+setup: |
+  if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  uv venv ~/unsloth-tts-venv --seed --python 3.11
+  . ~/unsloth-tts-venv/bin/activate
+  uv pip install gradio soundfile librosa torch transformers unsloth snac
+  curl -fsSL -o ~/gradio_tts.py https://raw.githubusercontent.com/transformerlab/transformerlab-examples/main/inference-unsloth-tts/gradio_tts.py
+  python -c "import gradio; print('gradio installed at:', gradio.__file__)"
+  python -c "import torch; print('torch version:', torch.__version__, 'CUDA available:', torch.cuda.is_available())"
+run: |
+  . ~/unsloth-tts-venv/bin/activate
+  MODEL_NAME=$MODEL_NAME \
+  MODEL_ARCHITECTURE=$MODEL_ARCHITECTURE \
+  VOICE=$VOICE \
+  python ~/gradio_tts.py > /tmp/gradio-tts.log 2>&1 &
+  sleep 10
+  tail -f /tmp/gradio-tts.log
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model_name:
+    field_name: "Model Name"
+    env_var: "MODEL_NAME"
+    field_type: "str"
+    required: true
+    placeholder: "e.g. sesame/csm-1b, unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit"
+    help_text: "HuggingFace model identifier for a supported TTS model (e.g. sesame/csm-1b for CSM, or an Orpheus model)"
+  model_architecture:
+    field_name: "Model Architecture"
+    env_var: "MODEL_ARCHITECTURE"
+    field_type: "str"
+    required: true
+    placeholder: "CsmForConditionalGeneration"
+    help_text: "The model architecture type. Use 'CsmForConditionalGeneration' for CSM models or 'orpheus' for Orpheus-based models."
+  voice:
+    field_name: "Voice"
+    env_var: "VOICE"
+    field_type: "str"
+    required: false
+    placeholder: "e.g. tara, jess"
+    help_text: "Optional voice preset for Orpheus models (e.g. tara, jess, leo, leah, dan, mia, zac, zoe). Ignored for CSM models."

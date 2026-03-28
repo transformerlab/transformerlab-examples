@@ -1,15 +1,15 @@
-name: fake-task
+name: sample-task
 github_repo_url: https://github.com/transformerlab/transformerlab-examples
-github_repo_dir: new-task-test
+github_repo_dir: sample-task
 resources:
   cpus: 2
   memory: 4
 setup: "uv pip install transformerlab wandb"
-run: "python ~/new-task-test/train.py"
+run: "python ~/sample-task/train.py"
 envs:
   WANDB_PROJECT: "my-training-project"
   PYTHONUNBUFFERED: "1"
-  WANDB_API_KEY: "<your_wandb_api_key_here>"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "HuggingFaceTB/SmolLM-135M-Instruct"
   dataset: "Trelis/touch-rugby-rules"

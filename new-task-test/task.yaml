@@ -9,7 +9,7 @@ run: "python ~/new-task-test/train.py"
 envs:
   WANDB_PROJECT: "my-training-project"
   PYTHONUNBUFFERED: "1"
-  WANDB_API_KEY: "<your_wandb_api_key_here>"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "HuggingFaceTB/SmolLM-135M-Instruct"
   dataset: "Trelis/touch-rugby-rules"

@@ -4,12 +4,12 @@ github_repo_dir: diffusion-train
 resources:
   accelerators: "A100-80GB:1"
 setup: "uv pip install transformerlab diffusers peft safetensors torch torchvision accelerate 'datasets==4.4.2' 'pyarrow==22.0.0' huggingface_hub 'transformers==4.57.3'"
-run: "cd ~/diffusion-train && python train.py"
+run: "python ~/diffusion-train/train.py"
 envs:
   WANDB_PROJECT: "stable-diffusion-training"
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER YOUR HF_TOKEN HERE"
-  WANDB_API_KEY: "ENTER YOUR WANDB_API_KEY HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
 parameters:
   model_name: "CompVis/stable-diffusion-v1-4"
   dataset: "nkasmanoff/nasa_earth_instagram"

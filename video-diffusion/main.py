@@ -29,7 +29,7 @@ def main():
         lab.init()
         config = lab.get_config()
 
-        model_id = config.get("model_id", "samuelchristlie/Wan2.1-T2V-1.3B-GGUF")
+        model_id = config.get("model_id", "Wan-AI/Wan2.1-T2V-1.3B-Diffusers")
         prompt = config.get("prompt", "A cat walks on the grass, realistic")
         negative_prompt = config.get("negative_prompt", "")
         height = int(config.get("height", 480))

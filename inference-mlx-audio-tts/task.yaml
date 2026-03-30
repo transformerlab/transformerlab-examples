@@ -6,18 +6,18 @@ resources:
   memory: 4
 setup: |
   brew install espeak-ng
-  echo "export ESPEAK_DATA_PATH=$(brew --prefix espeak-ng)/lib/espeak-ng-data" >> ~/.bashrc
-  echo "export PHONEMIZER_ESPEAK_PATH=$(brew --prefix espeak-ng)/bin/espeak-ng" >> ~/.bashrc
-  uv pip install gradio mlx-audio "librosa>=0.11.0" sounddevice numpy scipy "misaki[en]"
+  uv pip install "mlx-audio==0.2.10" gradio "librosa>=0.11.0" sounddevice numpy scipy
+  uv pip install pip
   python -c "import gradio; print('gradio installed at:', gradio.__file__)"
   python -c "import mlx_audio; print('mlx_audio installed at:', mlx_audio.__file__)"
 run: |
-  ESPEAK_DATA_PATH=$(brew --prefix espeak-ng)/lib/espeak-ng-data \
-  PHONEMIZER_ESPEAK_PATH=$(brew --prefix espeak-ng)/bin/espeak-ng \
+  export ESPEAK_DATA_PATH="$(brew --prefix espeak-ng)/share/espeak-ng-data"
+  echo "ESPEAK_DATA_PATH=$ESPEAK_DATA_PATH"
   MODEL_NAME=$MODEL_NAME VOICE=$VOICE LANG_CODE=$LANG_CODE \
   python ~/inference-mlx-audio-tts/gradio_tts.py
 envs:
   PYTHONUNBUFFERED: "1"
+  ESPEAK_DATA_PATH: "/opt/homebrew/share/espeak-ng-data"
 parameters:
   model_name:
     field_name: "Model Name"

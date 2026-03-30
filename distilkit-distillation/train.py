@@ -18,7 +18,7 @@ def train():
         training_config = {
             "project_name": config.get("project_name", "distilkit-distillation"),
             "model": config.get("model", "Qwen/Qwen3-8B"),
-            "output_path": config.get("output_path", "./output"),
+            "output_path": "./output",
             "sequence_length": int(config.get("sequence_length", 8192)),
             "dataset": {
                 "train_dataset": {

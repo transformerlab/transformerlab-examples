@@ -36,9 +36,9 @@ def main():
         width = int(config.get("width", 832))
         num_frames = int(config.get("num_frames", 81))
         guidance_scale = float(config.get("guidance_scale", 5.0))
-        output_dir = "./output"
-        output_filename = "generated_video.mp4"
-        fps = 15
+        output_dir = config.get("output_dir", "./output")
+        output_filename = config.get("output_filename", "generated_video.mp4")
+        fps = int(config.get("fps", 15))
 
         os.makedirs(output_dir, exist_ok=True)
 

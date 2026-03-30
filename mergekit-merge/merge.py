@@ -19,7 +19,7 @@ def merge_models():
             "weight1": float(config.get("weight1", "0.5")),
             "weight2": float(config.get("weight2", "0.5")),
             "merge_method": config.get("merge_method", "linear"),
-            "output_dir": config.get("output_dir", "./merged_model"),
+            "output_dir": "./merged_model",
             "dtype": config.get("dtype", "float16"),
             "tokenizer_source": config.get("tokenizer_source", "union"),
         }

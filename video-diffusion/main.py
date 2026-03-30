@@ -36,9 +36,9 @@ def main():
         width = int(config.get("width", 832))
         num_frames = int(config.get("num_frames", 81))
         guidance_scale = float(config.get("guidance_scale", 5.0))
-        output_dir = config.get("output_dir", "./output")
-        output_filename = config.get("output_filename", "generated_video.mp4")
-        fps = int(config.get("fps", 15))
+        output_dir = "./output"
+        output_filename = "generated_video.mp4"
+        fps = 15
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -57,16 +57,10 @@ def main():
 
         try:
             vae = AutoencoderKLWan.from_pretrained(
-                model_id,
-                subfolder="vae",
-                torch_dtype=torch.float32
+                model_id, subfolder="vae", torch_dtype=torch.float32
             )
 
-            pipe = WanPipeline.from_pretrained(
-                model_id,
-                vae=vae,
-                torch_dtype=dtype
-            )
+            pipe = WanPipeline.from_pretrained(model_id, vae=vae, torch_dtype=dtype)
 
         except Exception as e:
             lab.log(f"⚠️ Direct load failed: {e}")
@@ -78,14 +72,11 @@ def main():
                 local_repo,
                 subfolder="vae",
                 torch_dtype=torch.float32,
-                trust_remote_code=True
+                trust_remote_code=True,
             )
 
             pipe = WanPipeline.from_pretrained(
-                local_repo,
-                vae=vae,
-                torch_dtype=dtype,
-                trust_remote_code=True
+                local_repo, vae=vae, torch_dtype=dtype, trust_remote_code=True
             )
 
         pipe.to(device)
@@ -101,7 +92,7 @@ def main():
                 height=height,
                 width=width,
                 num_frames=num_frames,
-                guidance_scale=guidance_scale
+                guidance_scale=guidance_scale,
             ).frames[0]
 
         # Save video

@@ -1,0 +1,19 @@
+name: mergekit-merge
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: mergekit-merge
+resources:
+  cpus: 4
+  memory: 16
+setup: "git clone https://github.com/arcee-ai/mergekit.git && cd mergekit && uv pip install -e ."
+run: "python ~/mergekit-merge/merge.py"
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model1: "gpt2"
+  model2: "distilgpt2"
+  base_model: ""
+  weight1: "0.5"
+  weight2: "0.5"
+  merge_method: "linear"
+  dtype: "float16"
+  tokenizer_source: "union"

@@ -5,6 +5,6 @@ resources:
   accelerators: "A100:1"
 envs:
   PYTHONUNBUFFERED: "1"
-  HF_TOKEN: "ENTER_HF_TOKEN_HERE"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
 setup: "uv pip install --upgrade pip && uv pip install git+https://github.com/huggingface/diffusers.git && uv pip install 'transformers>=4.41.0' 'peft>=0.17.0' accelerate ftfy huggingface-hub opencv-python transformerlab imageio-ffmpeg"
 run: "python ~/video-diffusion/main.py"

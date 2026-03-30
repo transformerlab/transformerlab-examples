@@ -1,0 +1,21 @@
+name: multinode-example
+resources:
+  num_nodes: 2
+  cpus: 2
+setup: |
+  python -V || true
+  echo "setup complete"
+run: |
+  echo "=== Host/network context ==="
+  hostname
+  python - <<'PY'
+  import os, socket
+  keys = [
+      "MASTER_ADDR", "MASTER_PORT", "WORLD_SIZE",
+      "RANK", "LOCAL_RANK", "NODE_RANK"]
+  print("hostname:", socket.gethostname())
+  for k in keys:
+      print(f"{k}={os.environ.get(k)}")
+  PY
+
+  echo "done"

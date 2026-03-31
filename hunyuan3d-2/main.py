@@ -119,17 +119,35 @@ def main():
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.input) and args.mode in IMAGE_TO_3D_MODES:
-        print(f"Error: Input file not found: {args.input}")
+    # Normalize input: if a templated placeholder or empty value is passed,
+    # fall back to the bundled default image.
+    input_path = args.input
+    if not input_path or (isinstance(input_path, str) and input_path.strip() == ""):
+        input_path = DEFAULT_IMAGE_PATH
+
+    # Some runners inject templated placeholders like "{{input}}"; treat those
+    # as "no input provided" and fall back to the default image.
+    if (
+        isinstance(input_path, str)
+        and input_path.startswith("{{")
+        and input_path.endswith("}}")
+    ):
+        print(
+            f"Warning: detected placeholder input '{input_path}', using default image {DEFAULT_IMAGE_PATH}"
+        )
+        input_path = DEFAULT_IMAGE_PATH
+
+    if args.mode in IMAGE_TO_3D_MODES and not os.path.exists(input_path):
+        print(f"Error: Input file not found: {input_path}")
         sys.exit(1)
 
     print(f"Running Hunyuan3D-2.1 in {args.mode} mode")
-    print(f"Input: {args.input}")
+    print(f"Input: {input_path}")
     print(f"Output: {args.output}")
 
     if args.mode in IMAGE_TO_3D_MODES:
         output_path = generate_3d_from_image(
-            args.input,
+            input_path,
             args.output,
             args.model_path,
             args.low_vram_mode,

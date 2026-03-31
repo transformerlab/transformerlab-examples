@@ -8,6 +8,8 @@ HUNYUAN_ROOT = os.path.join(SCRIPT_DIR, "Hunyuan3D-2.1")
 HY3D_SHAPE_PATH = os.path.join(HUNYUAN_ROOT, "hy3dshape")
 HY3D_PAINT_PATH = os.path.join(HUNYUAN_ROOT, "hy3dpaint")
 DEFAULT_SHAPE_SUBFOLDER = "hunyuan3d-dit-v2-1"
+# Default image to use when no --input is supplied
+DEFAULT_IMAGE_PATH = os.path.join(SCRIPT_DIR, "dog.png")
 IMAGE_TO_3D_MODES = {"image2text", "image23d", "image2shape", "image-to-3d"}
 
 sys.path.insert(0, HY3D_SHAPE_PATH)
@@ -35,7 +37,9 @@ def _build_paint_config(output_dir):
     paint_config.realesrgan_ckpt_path = os.path.join(
         HUNYUAN_ROOT, "hy3dpaint", "ckpt", "RealESRGAN_x4plus.pth"
     )
-    paint_config.custom_pipeline = os.path.join(HUNYUAN_ROOT, "hy3dpaint", "hunyuanpaintpbr")
+    paint_config.custom_pipeline = os.path.join(
+        HUNYUAN_ROOT, "hy3dpaint", "hunyuanpaintpbr"
+    )
 
     return paint_config
 
@@ -89,7 +93,10 @@ def main():
         help="Generation mode",
     )
     parser.add_argument(
-        "--input", type=str, required=True, help="Input image path or text prompt"
+        "--input",
+        type=str,
+        default=DEFAULT_IMAGE_PATH,
+        help="Input image path or text prompt (defaults to the bundled dog.png)",
     )
     parser.add_argument(
         "--output", type=str, default="./output", help="Output directory"

@@ -137,6 +137,36 @@ def main():
         )
         input_path = DEFAULT_IMAGE_PATH
 
+    # Normalize model_path and shape_subfolder the same way: some runners may
+    # inject templated placeholders like "{{model_path}}" or empty values.
+    model_path = args.model_path
+    if not model_path or (isinstance(model_path, str) and model_path.strip() == ""):
+        model_path = "tencent/Hunyuan3D-2.1"
+    if (
+        isinstance(model_path, str)
+        and model_path.startswith("{{")
+        and model_path.endswith("}}")
+    ):
+        print(
+            f"Warning: detected placeholder model_path '{model_path}', using default 'tencent/Hunyuan3D-2.1'"
+        )
+        model_path = "tencent/Hunyuan3D-2.1"
+
+    shape_subfolder = args.shape_subfolder
+    if not shape_subfolder or (
+        isinstance(shape_subfolder, str) and shape_subfolder.strip() == ""
+    ):
+        shape_subfolder = DEFAULT_SHAPE_SUBFOLDER
+    if (
+        isinstance(shape_subfolder, str)
+        and shape_subfolder.startswith("{{")
+        and shape_subfolder.endswith("}}")
+    ):
+        print(
+            f"Warning: detected placeholder shape_subfolder '{shape_subfolder}', using default '{DEFAULT_SHAPE_SUBFOLDER}'"
+        )
+        shape_subfolder = DEFAULT_SHAPE_SUBFOLDER
+
     if args.mode in IMAGE_TO_3D_MODES and not os.path.exists(input_path):
         print(f"Error: Input file not found: {input_path}")
         sys.exit(1)
@@ -149,9 +179,9 @@ def main():
         output_path = generate_3d_from_image(
             input_path,
             args.output,
-            args.model_path,
+            model_path,
             args.low_vram_mode,
-            args.shape_subfolder,
+            shape_subfolder,
         )
     else:
         print("Text-to-3D mode not yet implemented in this script")

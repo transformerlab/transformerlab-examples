@@ -2,6 +2,8 @@ from unsloth import is_bfloat16_supported
 import os
 import torch
 from datetime import datetime
+import json
+import io
 
 from transformers import (
     TrainingArguments,
@@ -123,7 +125,112 @@ class LabCallback(TrainerCallback):
         lab.update_progress(95)
 
 
-def train_model():
+def generate_audio_sample(model, tokenizer, text, sampling_rate, output_path, device="cuda"):
+    """
+    Generate a synthetic audio sample from text using the model.
+    
+    Args:
+        model: The TTS model
+        tokenizer/processor: The model's processor
+        text: Text to synthesize
+        sampling_rate: Audio sampling rate
+        output_path: Path to save the audio file
+        device: Device to use (cuda or cpu)
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import numpy as np
+        from scipy.io import wavfile
+        
+        model.eval()
+        with torch.no_grad():
+            # Prepare inputs
+            inputs = tokenizer(text, return_tensors="pt", padding=True).to(device)
+            
+            # Generate audio
+            outputs = model.generate(**inputs)
+            
+            # Get audio array
+            if hasattr(outputs, 'waveform'):
+                audio_array = outputs.waveform.cpu().numpy()
+            else:
+                audio_array = outputs.cpu().numpy()
+            
+            # Ensure 1D array
+            if len(audio_array.shape) > 1:
+                audio_array = audio_array.squeeze()
+            
+            # Normalize audio to [-1, 1] range
+            max_val = np.max(np.abs(audio_array))
+            if max_val > 0:
+                audio_array = audio_array / max_val
+            
+            # Convert to int16 for WAV file
+            audio_int16 = np.int16(audio_array * 32767)
+            
+            # Save as WAV file
+            wavfile.write(output_path, sampling_rate, audio_int16)
+            return True
+    except Exception as e:
+        lab.log(f"⚠️  Error generating audio sample: {e}")
+        return False
+
+
+def save_audio_samples(model_before, tokenizer_before, model_after, tokenizer_after, 
+                       text_sample, sampling_rate, output_dir, device="cuda"):
+    """
+    Generate and save before/after training audio samples.
+    
+    Args:
+        model_before: Pre-trained model (before training)
+        tokenizer_before: Pre-trained model's processor
+        model_after: Fine-tuned model (after training)
+        tokenizer_after: Fine-tuned model's processor
+        text_sample: Sample text to synthesize
+        sampling_rate: Audio sampling rate
+        output_dir: Directory to save samples
+        device: Device to use
+    
+    Returns:
+        Tuple of (before_audio_path, after_audio_path) or (None, None) if failed
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    before_audio_path = os.path.join(output_dir, "sample_before_training.wav")
+    after_audio_path = os.path.join(output_dir, "sample_after_training.wav")
+    
+    lab.log(f"🎵 Generating audio samples with text: '{text_sample}'...")
+    
+    # Generate before training sample
+    lab.log("Generating pre-trained model sample...")
+    before_success = generate_audio_sample(
+        model_before, tokenizer_before, text_sample, 
+        sampling_rate, before_audio_path, device
+    )
+    
+    if before_success:
+        lab.log(f"✅ Generated before-training sample: {before_audio_path}")
+    else:
+        before_audio_path = None
+    
+    # Generate after training sample
+    lab.log("Generating fine-tuned model sample...")
+    after_success = generate_audio_sample(
+        model_after, tokenizer_after, text_sample, 
+        sampling_rate, after_audio_path, device
+    )
+    
+    if after_success:
+        lab.log(f"✅ Generated after-training sample: {after_audio_path}")
+    else:
+        after_audio_path = None
+    
+    return before_audio_path, after_audio_path
+
+
+
     """Train an audio model using unsloth."""
 
     # Configure GPU usage - use only GPU 0
@@ -398,6 +505,10 @@ def train_model():
         # Train the model
         lab.log("Starting training...")
         try:
+            # Save pre-trained model reference for audio sample comparison
+            pretrained_model = model
+            pretrained_tokenizer = tokenizer
+            
             trainer.train()
             lab.log("✅ Training completed successfully")
 
@@ -406,12 +517,63 @@ def train_model():
             model.save_pretrained(training_config["output_dir"])
             tokenizer.save_pretrained(training_config["output_dir"])
             lab.log("✅ Model and tokenizer saved")
+            
+            # Generate and save before/after training audio samples
+            lab.log("📊 Generating before/after training audio samples...")
+            try:
+                # Use a sample text from the dataset or a default one
+                sample_texts = [
+                    "Hello, this is a test of the text-to-speech system.",
+                    "The quick brown fox jumps over the lazy dog.",
+                    "Welcome to the audio synthesis demonstration.",
+                ]
+                
+                # Get a sample text from the dataset if possible
+                sample_text = sample_texts[0]
+                if len(dataset) > 0:
+                    try:
+                        sample_data = dataset[0]
+                        if training_config["_config"]["text_column_name"] in sample_data:
+                            sample_text = sample_data[training_config["_config"]["text_column_name"]]
+                            lab.log(f"Using dataset sample text: '{sample_text}'")
+                    except Exception:
+                        lab.log("Using default sample text for audio generation")
+                
+                before_audio, after_audio = save_audio_samples(
+                    model_before=pretrained_model,
+                    tokenizer_before=pretrained_tokenizer,
+                    model_after=model,
+                    tokenizer_after=tokenizer,
+                    text_sample=sample_text,
+                    sampling_rate=training_config["_config"]["sampling_rate"],
+                    output_dir=training_config["output_dir"],
+                    device=training_config["_config"]["device"]
+                )
+                
+                # Save audio samples as artifacts
+                if before_audio and os.path.exists(before_audio):
+                    before_artifact_path = lab.save_artifact(
+                        before_audio, 
+                        "sample_before_training.wav"
+                    )
+                    lab.log(f"✅ Saved before-training audio artifact: {before_artifact_path}")
+                
+                if after_audio and os.path.exists(after_audio):
+                    after_artifact_path = lab.save_artifact(
+                        after_audio, 
+                        "sample_after_training.wav"
+                    )
+                    lab.log(f"✅ Saved after-training audio artifact: {after_artifact_path}")
+                    
+            except Exception as e:
+                lab.log(f"⚠️  Could not generate audio samples: {e}")
+                import traceback
+                traceback.print_exc()
 
             # Create training summary artifact
             progress_file = os.path.join(
                 training_config["output_dir"], "training_summary.json"
             )
-            import json
 
             with open(progress_file, "w") as f:
                 json.dump(

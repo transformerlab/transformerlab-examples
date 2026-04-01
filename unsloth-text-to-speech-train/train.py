@@ -230,7 +230,7 @@ def save_audio_samples(model_before, tokenizer_before, model_after, tokenizer_af
     return before_audio_path, after_audio_path
 
 
-
+def train_model():
     """Train an audio model using unsloth."""
 
     # Configure GPU usage - use only GPU 0

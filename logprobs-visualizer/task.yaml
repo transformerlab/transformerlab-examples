@@ -1,0 +1,23 @@
+name: logprobs-visualizer
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: logprobs-visualizer
+resources:
+  cpus: 2
+  memory: 4
+setup: |
+  uv pip install gradio torch transformers
+  python -c "import gradio; print('gradio installed at:', gradio.__file__)"
+run: |
+  python ~/logprobs-visualizer/app.py > /tmp/gradio.log 2>&1 &
+  sleep 3
+  tail -f /tmp/gradio.log
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model_name:
+    field_name: "Model Name"
+    env_var: "MODEL_NAME"
+    field_type: "str"
+    required: true
+    default: "HuggingFaceTB/SmolLM-135M"
+    help_text: "HuggingFace model name (e.g. openai-community/gpt2, gpt2-medium,EleutherAI/gpt-neo-125M)"

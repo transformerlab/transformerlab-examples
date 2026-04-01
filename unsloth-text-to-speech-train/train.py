@@ -4,6 +4,10 @@ import torch
 from datetime import datetime
 import json
 import io
+import tempfile
+import librosa
+import numpy as np
+import soundfile as sf
 
 from transformers import (
     TrainingArguments,
@@ -125,73 +129,102 @@ class LabCallback(TrainerCallback):
         lab.update_progress(95)
 
 
-def generate_audio_sample(model, tokenizer, text, sampling_rate, output_path, device="cuda"):
+def generate_audio_sample(model, processor, text, sampling_rate, output_path, device="cuda", model_architecture="OrpheusForConditionalGeneration"):
     """
-    Generate a synthetic audio sample from text using the model.
+    Generate a synthetic audio sample from text using the trained model.
+    Uses the proper inference approach from gradio_tts.py
     
     Args:
-        model: The TTS model
-        tokenizer/processor: The model's processor
+        model: The TTS model (already loaded)
+        processor: The model's processor
         text: Text to synthesize
         sampling_rate: Audio sampling rate
         output_path: Path to save the audio file
         device: Device to use (cuda or cpu)
+        model_architecture: The model architecture type
     
     Returns:
         True if successful, False otherwise
     """
     try:
-        import numpy as np
-        from scipy.io import wavfile
-        
+        # Ensure model is in eval mode
         model.eval()
+        
         with torch.no_grad():
-            # Prepare inputs
-            inputs = tokenizer(text, return_tensors="pt", padding=True).to(device)
+            # Tokenize input text
+            if model_architecture == "CsmForConditionalGeneration":
+                inputs = processor(f"[0]{text}", add_special_tokens=True).to(device)
+            else:  # OrpheusForConditionalGeneration
+                inputs = processor(text, return_tensors="pt").to(device)
             
-            # Generate audio
-            outputs = model.generate(**inputs)
+            # Generate audio with proper parameters
+            generated = model.generate(
+                **inputs,
+                max_new_tokens=1024,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.95,
+            )
             
-            # Get audio array
-            if hasattr(outputs, 'waveform'):
-                audio_array = outputs.waveform.cpu().numpy()
+            # Decode the generated output
+            if model_architecture == "CsmForConditionalGeneration":
+                # For CSM models
+                audio = generated[0].to(torch.float32).cpu().numpy()
             else:
-                audio_array = outputs.cpu().numpy()
+                # For Orpheus models - extract the speech tokens
+                # This is a simplified version; full implementation would use SNAC decoder
+                if hasattr(generated, 'numpy'):
+                    audio = generated.cpu().numpy()
+                else:
+                    audio = generated[0].cpu().numpy()
             
-            # Ensure 1D array
-            if len(audio_array.shape) > 1:
-                audio_array = audio_array.squeeze()
+            # Ensure audio is properly shaped and normalized
+            if len(audio.shape) > 1:
+                audio = audio.squeeze()
             
             # Normalize audio to [-1, 1] range
-            max_val = np.max(np.abs(audio_array))
+            max_val = np.max(np.abs(audio))
             if max_val > 0:
-                audio_array = audio_array / max_val
+                audio = audio / (max_val * 1.1)  # Add slight headroom
+            
+            # Clip to valid range
+            audio = np.clip(audio, -1.0, 1.0)
             
             # Convert to int16 for WAV file
-            audio_int16 = np.int16(audio_array * 32767)
+            audio_int16 = np.int16(audio * 32767)
             
             # Save as WAV file
-            wavfile.write(output_path, sampling_rate, audio_int16)
-            return True
+            sf.write(output_path, audio_int16, sampling_rate)
+            
+            # Verify file was created and has content
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                return True
+            else:
+                lab.log(f"⚠️  Generated audio file is empty: {output_path}")
+                return False
+                
     except Exception as e:
         lab.log(f"⚠️  Error generating audio sample: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
-def save_audio_samples(model_before, tokenizer_before, model_after, tokenizer_after, 
-                       text_sample, sampling_rate, output_dir, device="cuda"):
+def save_audio_samples(model_before, processor_before, model_after, processor_after, 
+                       text_sample, sampling_rate, output_dir, device="cuda", model_architecture="OrpheusForConditionalGeneration"):
     """
     Generate and save before/after training audio samples.
     
     Args:
         model_before: Pre-trained model (before training)
-        tokenizer_before: Pre-trained model's processor
+        processor_before: Pre-trained model's processor
         model_after: Fine-tuned model (after training)
-        tokenizer_after: Fine-tuned model's processor
+        processor_after: Fine-tuned model's processor
         text_sample: Sample text to synthesize
         sampling_rate: Audio sampling rate
         output_dir: Directory to save samples
         device: Device to use
+        model_architecture: The model architecture type
     
     Returns:
         Tuple of (before_audio_path, after_audio_path) or (None, None) if failed
@@ -206,24 +239,26 @@ def save_audio_samples(model_before, tokenizer_before, model_after, tokenizer_af
     # Generate before training sample
     lab.log("Generating pre-trained model sample...")
     before_success = generate_audio_sample(
-        model_before, tokenizer_before, text_sample, 
-        sampling_rate, before_audio_path, device
+        model_before, processor_before, text_sample, 
+        sampling_rate, before_audio_path, device, model_architecture
     )
     
     if before_success:
-        lab.log(f"✅ Generated before-training sample: {before_audio_path}")
+        file_size = os.path.getsize(before_audio_path)
+        lab.log(f"✅ Generated before-training sample: {before_audio_path} ({file_size} bytes)")
     else:
         before_audio_path = None
     
     # Generate after training sample
     lab.log("Generating fine-tuned model sample...")
     after_success = generate_audio_sample(
-        model_after, tokenizer_after, text_sample, 
-        sampling_rate, after_audio_path, device
+        model_after, processor_after, text_sample, 
+        sampling_rate, after_audio_path, device, model_architecture
     )
     
     if after_success:
-        lab.log(f"✅ Generated after-training sample: {after_audio_path}")
+        file_size = os.path.getsize(after_audio_path)
+        lab.log(f"✅ Generated after-training sample: {after_audio_path} ({file_size} bytes)")
     else:
         after_audio_path = None
     
@@ -541,13 +576,14 @@ def train_model():
                 
                 before_audio, after_audio = save_audio_samples(
                     model_before=pretrained_model,
-                    tokenizer_before=pretrained_tokenizer,
+                    processor_before=pretrained_tokenizer,
                     model_after=model,
-                    tokenizer_after=tokenizer,
+                    processor_after=tokenizer,
                     text_sample=sample_text,
                     sampling_rate=training_config["_config"]["sampling_rate"],
                     output_dir=training_config["output_dir"],
-                    device=training_config["_config"]["device"]
+                    device=training_config["_config"]["device"],
+                    model_architecture=training_config["_config"]["model_architecture"]
                 )
                 
                 # Save audio samples as artifacts

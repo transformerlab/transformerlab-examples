@@ -1,193 +1,157 @@
-import argparse
 import os
 import sys
+import argparse
+import traceback
 
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-HUNYUAN_ROOT = os.path.join(SCRIPT_DIR, "Hunyuan3D-2.1")
-HY3D_SHAPE_PATH = os.path.join(HUNYUAN_ROOT, "hy3dshape")
-HY3D_PAINT_PATH = os.path.join(HUNYUAN_ROOT, "hy3dpaint")
-DEFAULT_SHAPE_SUBFOLDER = "hunyuan3d-dit-v2-1"
-# Default image to use when no --input is supplied
-DEFAULT_IMAGE_PATH = os.path.join(SCRIPT_DIR, "dog.png")
-IMAGE_TO_3D_MODES = {"image2text", "image23d", "image2shape", "image-to-3d"}
-
-sys.path.insert(0, HY3D_SHAPE_PATH)
-sys.path.insert(0, HY3D_PAINT_PATH)
-
-from textureGenPipeline import Hunyuan3DPaintPipeline, Hunyuan3DPaintConfig
-from hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
+def resolve_path(path: str) -> str:
+    return os.path.abspath(os.path.expanduser(path))
 
 
-def _require_hunyuan_checkout():
-    if not os.path.isdir(HUNYUAN_ROOT):
-        raise FileNotFoundError(
-            f"Hunyuan checkout not found at {HUNYUAN_ROOT}. Run the task setup first."
-        )
+def ensure_sys_path(path: str):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 
-def _build_paint_config(output_dir):
+def ensure_simplify_stub(hunyuan_root: str):
+    """Create missing simplify_mesh_utils if not present."""
+    utils_dir = os.path.join(hunyuan_root, "hy3dpaint", "utils")
+    os.makedirs(utils_dir, exist_ok=True)
+
+    simplify_file = os.path.join(utils_dir, "simplify_mesh_utils.py")
+
+    if not os.path.exists(simplify_file):
+        print("⚠️ Missing simplify_mesh_utils.py → creating stub")
+        with open(simplify_file, "w") as f:
+            f.write(
+                "def remesh_mesh(mesh, *args, **kwargs):\n"
+                "    return mesh\n"
+            )
+
+
+def ensure_realesrgan(hunyuan_root: str):
+    """Ensure ESRGAN weights exist."""
+    ckpt_dir = os.path.join(hunyuan_root, "hy3dpaint", "ckpt")
+    os.makedirs(ckpt_dir, exist_ok=True)
+
+    model_path = os.path.join(ckpt_dir, "RealESRGAN_x4plus.pth")
+
+    if not os.path.exists(model_path):
+        print("⚠️ RealESRGAN model missing. Please download it manually.")
+        print("Expected at:", model_path)
+
+
+def load_pipelines(model_path, shape_subfolder):
+    import torch
+
+    from hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
+    from textureGenPipeline import (
+        Hunyuan3DPaintPipeline,
+        Hunyuan3DPaintConfig,
+    )
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    print(f"🚀 Loading shape model on {device}...")
+    shape_pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
+        model_path,
+        subfolder=shape_subfolder,
+        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
+    ).to(device)
+
+    print("🎨 Loading paint model...")
     paint_config = Hunyuan3DPaintConfig(max_num_view=6, resolution=512)
 
-    # The upstream paint pipeline expects these paths relative to the Hunyuan repo
-    # root, but this example runs from a wrapper directory.
-    paint_config.multiview_cfg_path = os.path.join(
-        HUNYUAN_ROOT, "hy3dpaint", "cfgs", "hunyuan-paint-pbr.yaml"
-    )
-    paint_config.realesrgan_ckpt_path = os.path.join(
-        HUNYUAN_ROOT, "hy3dpaint", "ckpt", "RealESRGAN_x4plus.pth"
-    )
-    paint_config.custom_pipeline = os.path.join(
-        HUNYUAN_ROOT, "hy3dpaint", "hunyuanpaintpbr"
-    )
-
-    return paint_config
+    return shape_pipeline, Hunyuan3DPaintPipeline(paint_config)
 
 
-def generate_3d_from_image(
-    image_path,
-    output_dir,
-    model_path,
-    low_vram_mode=False,
-    shape_subfolder=DEFAULT_SHAPE_SUBFOLDER,
-):
-    del low_vram_mode
+def generate_3d(image_path, output_dir, model_path, shape_subfolder):
+    shape_pipeline, paint_pipeline = load_pipelines(model_path, shape_subfolder)
 
-    _require_hunyuan_checkout()
-    os.makedirs(output_dir, exist_ok=True)
-
-    print(f"Loading shape model from {model_path}...")
-    shape_pipeline = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
-        model_path, subfolder=shape_subfolder
-    )
-
-    print("Generating 3D shape from image...")
-    mesh_untextured = shape_pipeline(image=image_path)[0]
+    print("🧠 Generating 3D shape...")
+    try:
+        result = shape_pipeline(image=image_path)
+        mesh = result[0] if isinstance(result, (list, tuple)) else result
+    except Exception:
+        print("❌ Shape generation failed")
+        traceback.print_exc()
+        raise
 
     mesh_path = os.path.join(output_dir, "mesh.obj")
-    mesh_untextured.export(mesh_path)
-    print(f"Saved mesh to {mesh_path}")
+    mesh.export(mesh_path)
+    print(f"✅ Mesh saved: {mesh_path}")
 
-    print("Loading texture model...")
-    paint_config = _build_paint_config(output_dir)
-    paint_pipeline = Hunyuan3DPaintPipeline(paint_config)
+    print("🎨 Generating texture...")
+    try:
+        textured_path = paint_pipeline(
+            mesh_path=mesh_path,
+            image_path=image_path,
+            output_mesh_path=os.path.join(output_dir, "textured_mesh.obj"),
+        )
+    except Exception:
+        print("❌ Texture generation failed")
+        traceback.print_exc()
+        raise
 
-    print("Generating textures...")
-    output_path = paint_pipeline(
-        mesh_path=mesh_path,
-        image_path=image_path,
-        output_mesh_path=os.path.join(output_dir, "textured_mesh.obj"),
-    )
-
-    print(f"Saved textured 3D model to {output_path}")
-    return output_path
+    print(f"✅ Final output: {textured_path}")
+    return textured_path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Hunyuan3D-2.1 3D Generation")
-    parser.add_argument(
-        "--mode",
-        type=str,
-        default="image2text",
-        choices=sorted(IMAGE_TO_3D_MODES | {"text2text"}),
-        help="Generation mode",
-    )
-    parser.add_argument(
-        "--input",
-        type=str,
-        default=DEFAULT_IMAGE_PATH,
-        help="Input image path or text prompt (defaults to the bundled dog.png)",
-    )
-    parser.add_argument(
-        "--output", type=str, default="./output", help="Output directory"
-    )
-    parser.add_argument(
-        "--model_path",
-        type=str,
-        default="tencent/Hunyuan3D-2.1",
-        help="HuggingFace model path",
-    )
+    parser = argparse.ArgumentParser(description="Hunyuan3D Inference")
+
+    parser.add_argument("--input", type=str, required=True)
+    parser.add_argument("--output", type=str, default="./output")
+    parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument(
         "--shape_subfolder",
         type=str,
-        default=DEFAULT_SHAPE_SUBFOLDER,
-        help="Shape model subfolder inside the HuggingFace repository",
-    )
-    parser.add_argument(
-        "--low_vram_mode", action="store_true", help="Enable low VRAM mode"
+        default="hunyuan3d-dit-v2-1",
     )
 
     args = parser.parse_args()
 
-    # Normalize input: if a templated placeholder or empty value is passed,
-    # fall back to the bundled default image.
-    input_path = args.input
-    if not input_path or (isinstance(input_path, str) and input_path.strip() == ""):
-        input_path = DEFAULT_IMAGE_PATH
+    input_path = resolve_path(args.input)
+    output_dir = resolve_path(args.output)
+    model_path = args.model_path  # can be HF or local
 
-    # Some runners inject templated placeholders like "{{input}}"; treat those
-    # as "no input provided" and fall back to the default image.
-    if (
-        isinstance(input_path, str)
-        and input_path.startswith("{{")
-        and input_path.endswith("}}")
-    ):
-        print(
-            f"Warning: detected placeholder input '{input_path}', using default image {DEFAULT_IMAGE_PATH}"
-        )
-        input_path = DEFAULT_IMAGE_PATH
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Input not found: {input_path}")
 
-    # Normalize model_path and shape_subfolder the same way: some runners may
-    # inject templated placeholders like "{{model_path}}" or empty values.
-    model_path = args.model_path
-    if not model_path or (isinstance(model_path, str) and model_path.strip() == ""):
-        model_path = "tencent/Hunyuan3D-2.1"
-    if (
-        isinstance(model_path, str)
-        and model_path.startswith("{{")
-        and model_path.endswith("}}")
-    ):
-        print(
-            f"Warning: detected placeholder model_path '{model_path}', using default 'tencent/Hunyuan3D-2.1'"
-        )
-        model_path = "tencent/Hunyuan3D-2.1"
+    os.makedirs(output_dir, exist_ok=True)
 
-    shape_subfolder = args.shape_subfolder
-    if not shape_subfolder or (
-        isinstance(shape_subfolder, str) and shape_subfolder.strip() == ""
-    ):
-        shape_subfolder = DEFAULT_SHAPE_SUBFOLDER
-    if (
-        isinstance(shape_subfolder, str)
-        and shape_subfolder.startswith("{{")
-        and shape_subfolder.endswith("}}")
-    ):
-        print(
-            f"Warning: detected placeholder shape_subfolder '{shape_subfolder}', using default '{DEFAULT_SHAPE_SUBFOLDER}'"
-        )
-        shape_subfolder = DEFAULT_SHAPE_SUBFOLDER
-
-    if args.mode in IMAGE_TO_3D_MODES and not os.path.exists(input_path):
-        print(f"Error: Input file not found: {input_path}")
-        sys.exit(1)
-
-    print(f"Running Hunyuan3D-2.1 in {args.mode} mode")
-    print(f"Input: {input_path}")
-    print(f"Output: {args.output}")
-
-    if args.mode in IMAGE_TO_3D_MODES:
-        output_path = generate_3d_from_image(
-            input_path,
-            args.output,
-            model_path,
-            args.low_vram_mode,
-            shape_subfolder,
-        )
+    # If model_path is local → use it for sys.path
+    if os.path.exists(model_path):
+        ensure_sys_path(model_path)
+        hunyuan_root = model_path
     else:
-        print("Text-to-3D mode not yet implemented in this script")
+        # HF mode: assume working dir contains repo
+        hunyuan_root = resolve_path("Hunyuan3D-2.1")
+        ensure_sys_path(hunyuan_root)
+
+    # Fix missing components
+    ensure_simplify_stub(hunyuan_root)
+    ensure_realesrgan(hunyuan_root)
+
+    print("📦 Starting Hunyuan3D pipeline")
+    print(f"Input: {input_path}")
+    print(f"Output: {output_dir}")
+    print(f"Model: {model_path}")
+
+    try:
+        output = generate_3d(
+            input_path,
+            output_dir,
+            model_path,
+            args.shape_subfolder,
+        )
+    except Exception:
+        print("❌ Pipeline failed")
+        traceback.print_exc()
         sys.exit(1)
 
-    print(f"Done! 3D model saved to: {output_path}")
+    print("🎉 Done!")
+    print(f"Saved at: {output}")
 
 
 if __name__ == "__main__":

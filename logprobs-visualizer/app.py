@@ -69,15 +69,9 @@ def get_logprobs(prompt: str) -> dict:
 
         html = build_html_visualization(response_text, logprobs_data)
 
-        return {
-            "html": html,
-            "json": {"response": response_text, "logprobs": logprobs_data},
-        }
+        return html, {"response": response_text, "logprobs": logprobs_data}
     except Exception as e:
-        return {
-            "html": f"<div class='error'>Error: {str(e)}</div>",
-            "json": {"error": str(e)},
-        }
+        return f"<div class='error'>Error: {str(e)}</div>", {"error": str(e)}
 
 
 def build_html_visualization(text: str, logprobs_data: list) -> str:

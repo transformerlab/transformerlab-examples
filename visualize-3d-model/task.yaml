@@ -1,0 +1,5 @@
+title: 3D Model Viewer
+name: visualize-3d-model
+description: Interactive Gradio UI for visualizing 3D models (.obj, .glb, .gltf)
+command: python main.py
+parameters: {}

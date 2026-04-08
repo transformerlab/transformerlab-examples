@@ -17,6 +17,7 @@ from transformers import (
     TrainerState,
 )
 from datasets import Audio
+from snac import SNAC
 
 from trainer import CsmAudioTrainer, OrpheusAudioTrainer
 
@@ -129,10 +130,70 @@ class LabCallback(TrainerCallback):
         lab.update_progress(95)
 
 
+def _decode_orpheus_audio(generated_ids, snac_model, device):
+    """Decode Orpheus tokens back to audio using SNAC codec."""
+    END_OF_SPEECH = 128258
+    START_OF_SPEECH = 128257
+    CODE_TOKEN_OFFSET = 128266
+    
+    try:
+        # Extract audio tokens (find the last occurrence of START_OF_SPEECH)
+        start_indices = (generated_ids == START_OF_SPEECH).nonzero(as_tuple=True)
+        if len(start_indices[1]) > 0:
+            last_start_idx = start_indices[1][-1].item()
+            cropped_tensor = generated_ids[:, last_start_idx + 1:]
+        else:
+            cropped_tensor = generated_ids
+        
+        # Remove end-of-speech tokens
+        processed_tokens = [row[row != END_OF_SPEECH] for row in cropped_tensor]
+        row = processed_tokens[0]
+        
+        # Trim to multiple of 7 (SNAC layer structure: 7 codes per group)
+        row_length = row.size(0)
+        new_length = (row_length // 7) * 7
+        trimmed_row = row[:new_length]
+        
+        # Convert to codec codes by removing the offset
+        codec_codes = [token.item() - CODE_TOKEN_OFFSET for token in trimmed_row]
+        
+        # Redistribute across SNAC layers (7 codes per group):
+        # Layer 1: 1 token per group
+        # Layer 2: 2 tokens per group with offsets
+        # Layer 3: 4 tokens per group with offsets
+        layer_1, layer_2, layer_3 = [], [], []
+        for i in range((len(codec_codes) + 1) // 7):
+            base_idx = 7 * i
+            if base_idx >= len(codec_codes):
+                break
+                
+            layer_1.append(codec_codes[base_idx])
+            layer_2.append(codec_codes[base_idx + 1] - 4096)
+            layer_2.append(codec_codes[base_idx + 4] - 4 * 4096)
+            layer_3.append(codec_codes[base_idx + 2] - 2 * 4096)
+            layer_3.append(codec_codes[base_idx + 3] - 3 * 4096)
+            layer_3.append(codec_codes[base_idx + 5] - 5 * 4096)
+            layer_3.append(codec_codes[base_idx + 6] - 6 * 4096)
+        
+        # Convert to tensors and decode using SNAC
+        codes = [
+            torch.tensor(layer_1, device=device).unsqueeze(0),
+            torch.tensor(layer_2, device=device).unsqueeze(0),
+            torch.tensor(layer_3, device=device).unsqueeze(0),
+        ]
+        
+        audio = snac_model.decode(codes).squeeze().to(torch.float32).cpu().detach().numpy()
+        return audio
+    except Exception as e:
+        lab.log(f"⚠️  Error decoding Orpheus audio: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 def generate_audio_sample(model, processor, text, sampling_rate, output_path, device="cuda", model_architecture="OrpheusForConditionalGeneration"):
     """
     Generate a synthetic audio sample from text using the trained model.
-    Uses the proper inference approach from gradio_tts.py
     
     Args:
         model: The TTS model (already loaded)
@@ -154,35 +215,43 @@ def generate_audio_sample(model, processor, text, sampling_rate, output_path, de
             # Tokenize input text
             if model_architecture == "CsmForConditionalGeneration":
                 inputs = processor(f"[0]{text}", add_special_tokens=True).to(device)
-            else:  # OrpheusForConditionalGeneration
-                inputs = processor(text, return_tensors="pt").to(device)
-            
-            # Generate audio with proper parameters
-            generated = model.generate(
-                **inputs,
-                max_new_tokens=1024,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.95,
-            )
-            
-            # Decode the generated output
-            if model_architecture == "CsmForConditionalGeneration":
+                # Generate audio with proper parameters
+                generated = model.generate(
+                    **inputs,
+                    max_new_tokens=1024,
+                    do_sample=True,
+                    temperature=0.7,
+                    top_p=0.95,
+                )
                 # For CSM models
                 audio = generated[0].to(torch.float32).cpu().numpy()
-            else:
-                # For Orpheus models - extract the speech tokens
-                # This is a simplified version; full implementation would use SNAC decoder
-                if hasattr(generated, 'numpy'):
-                    audio = generated.cpu().numpy()
-                else:
-                    audio = generated[0].cpu().numpy()
+                
+            else:  # OrpheusForConditionalGeneration
+                # Tokenize using processor
+                text_tokens = processor(text, return_tensors="pt")["input_ids"].to(device)
+                
+                # Initialize SNAC model for decoding
+                snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").to(device)
+                
+                # Generate with proper Orpheus parameters
+                generated = model.generate(
+                    text_tokens,
+                    max_new_tokens=10240,
+                    eos_token_id=128258,  # END_OF_SPEECH
+                    use_cache=True,
+                    repetition_penalty=1.1,
+                    do_sample=True,
+                    temperature=0.7,
+                    top_p=0.95,
+                )
+                
+                # Decode using SNAC codec
+                audio = _decode_orpheus_audio(generated, snac_model, device)
+                if audio is None:
+                    lab.log(f"⚠️  Failed to decode Orpheus audio")
+                    return False
             
-            # Ensure audio is properly shaped and normalized
-            if len(audio.shape) > 1:
-                audio = audio.squeeze()
-            
-            # Normalize audio to [-1, 1] range
+            # Normalize audio
             max_val = np.max(np.abs(audio))
             if max_val > 0:
                 audio = audio / (max_val * 1.1)  # Add slight headroom
@@ -556,15 +625,8 @@ def train_model():
             # Generate and save before/after training audio samples
             lab.log("📊 Generating before/after training audio samples...")
             try:
-                # Use a sample text from the dataset or a default one
-                sample_texts = [
-                    "Hello, this is a test of the text-to-speech system.",
-                    "The quick brown fox jumps over the lazy dog.",
-                    "Welcome to the audio synthesis demonstration.",
-                ]
-                
-                # Get a sample text from the dataset if possible
-                sample_text = sample_texts[0]
+                # Use the specified sample text or a default one from the dataset
+                sample_text = "Hello welcome to transformer lab, where we turn text into natural sounding speech"
                 if len(dataset) > 0:
                     try:
                         sample_data = dataset[0]

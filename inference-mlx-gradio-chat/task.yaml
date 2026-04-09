@@ -5,7 +5,8 @@ resources:
   cpus: 2
   memory: 4
 setup: |
-  uv pip install gradio openai "mlx-lm>=0.28.3"
+  uv pip install --upgrade gradio
+  uv pip install openai "mlx-lm>=0.28.3"
 run: |
   MODEL_NAME=$MODEL_NAME python ~/inference-mlx-gradio-chat/gradio_chat.py
 envs:

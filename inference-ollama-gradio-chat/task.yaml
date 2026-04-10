@@ -19,9 +19,9 @@ run: |
   sleep 3
   if ! kill -0 $OLLAMA_PID 2>/dev/null; then
     echo "ERROR: Ollama failed to start" >&2
-    echo "=== START ollama.log ==="
+    echo "=== START ollama.log ===" >&2
     cat /tmp/ollama.log >&2
-    echo "=== END ollama.log ==="
+    echo "=== END ollama.log ===" >&2
     exit 1
   fi
 
@@ -35,9 +35,9 @@ run: |
   sleep 5
   if ! kill -0 $GRADIO_PID 2>/dev/null; then
     echo "ERROR: Gradio failed to start" >&2
-    echo "=== START gradio.log ==="
+    echo "=== START gradio.log ===" >&2
     cat /tmp/gradio.log >&2
-    echo "=== END gradio.log ==="
+    echo "=== END gradio.log ===" >&2
     exit 1
   fi
 

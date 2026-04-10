@@ -11,10 +11,7 @@ setup: |
   python -c "import gradio; print('gradio installed at:', gradio.__file__)"
   python -c "import mlx_audio; print('mlx_audio installed at:', mlx_audio.__file__)"
 run: |
-  export ESPEAK_DATA_PATH="$(brew --prefix espeak-ng)/share/espeak-ng-data"
-  echo "ESPEAK_DATA_PATH=$ESPEAK_DATA_PATH"
-  MODEL_NAME=$MODEL_NAME VOICE=$VOICE LANG_CODE=$LANG_CODE \
-  python ~/inference-mlx-audio-tts/gradio_tts.py
+  python ~/inference-mlx-audio-tts/run.py
 envs:
   PYTHONUNBUFFERED: "1"
   ESPEAK_DATA_PATH: "/opt/homebrew/share/espeak-ng-data"

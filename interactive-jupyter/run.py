@@ -33,14 +33,20 @@ def _tail_forever() -> None:
             time.sleep(0.25)
 
 
+def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
+    code = process.poll()
+    if code is not None:
+        raise RuntimeError(f"{name} exited early with code {code}")
+
+
 def main() -> None:
     _touch_logs()
     ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "")
     if ngrok_auth_token:
-        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=False)
+        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=True)
 
     with open("/tmp/jupyter.log", "w", encoding="utf-8") as jupyter_log:
-        subprocess.Popen(
+        jupyter_process = subprocess.Popen(
             [
                 "jupyter",
                 "lab",
@@ -50,15 +56,18 @@ def main() -> None:
                 "--allow-root",
                 "--NotebookApp.token=",
                 "--NotebookApp.password=",
-                "--notebook-dir=~",
+                f"--notebook-dir={os.path.expanduser('~')}",
             ],
             stdout=jupyter_log,
             stderr=subprocess.STDOUT,
         )
     time.sleep(3)
+    _ensure_running(jupyter_process, "jupyter lab")
 
     with open("/tmp/ngrok.log", "w", encoding="utf-8") as ngrok_log:
-        subprocess.Popen(["ngrok", "http", "8888", "--log=stdout"], stdout=ngrok_log, stderr=subprocess.STDOUT)
+        ngrok_process = subprocess.Popen(["ngrok", "http", "8888", "--log=stdout"], stdout=ngrok_log, stderr=subprocess.STDOUT)
+    time.sleep(1)
+    _ensure_running(ngrok_process, "ngrok http 8888")
 
     _tail_forever()
 

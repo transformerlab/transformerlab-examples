@@ -12,7 +12,10 @@ def main() -> int:
         stdout=sys.stdout,
         stderr=sys.stderr,
     )
-    return process.wait()
+    code = process.wait()
+    if code != 0:
+        raise RuntimeError(f"code tunnel exited with code {code}")
+    return code
 
 
 if __name__ == "__main__":

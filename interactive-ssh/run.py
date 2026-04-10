@@ -27,16 +27,24 @@ def _tail_forever(path: pathlib.Path) -> None:
             time.sleep(0.25)
 
 
+def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
+    code = process.poll()
+    if code is not None:
+        raise RuntimeError(f"{name} exited early with code {code}")
+
+
 def main() -> None:
     ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "")
     if ngrok_auth_token:
-        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=False)
+        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=True)
 
     username = getpass.getuser() or os.path.basename(os.path.expanduser("~"))
     print(f"USER_ID={username}", flush=True)
 
     with open(LOG_PATH, "w", encoding="utf-8") as ngrok_log:
-        subprocess.Popen(["ngrok", "tcp", "22", "--log=stdout"], stdout=ngrok_log, stderr=subprocess.STDOUT)
+        ngrok_process = subprocess.Popen(["ngrok", "tcp", "22", "--log=stdout"], stdout=ngrok_log, stderr=subprocess.STDOUT)
+    time.sleep(1)
+    _ensure_running(ngrok_process, "ngrok tcp 22")
 
     _tail_forever(LOG_PATH)
 

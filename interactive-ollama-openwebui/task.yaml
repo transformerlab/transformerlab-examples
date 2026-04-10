@@ -1,0 +1,34 @@
+name: ollama-open-webui
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: interactive-ollama-openwebui
+resources:
+  cpus: 2
+  memory: 8
+setup: |
+  if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  uv venv ~/ollama-venv --seed --python 3.11
+  . ~/ollama-venv/bin/activate
+  uv pip install open-webui
+  if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
+  if [ "$(uname)" != "Darwin" ]; then $SUDO apt-get update && $SUDO apt-get install -y pciutils lshw; fi
+run: |
+  python ~/interactive-ollama-openwebui/run.py
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model_name:
+    field_name: "Model Name"
+    env_var: "MODEL_NAME"
+    field_type: "str"
+    required: true
+    placeholder: "e.g. llama2, mistral, codellama"
+    help_text: "Ollama model name (e.g. llama2, mistral, codellama). Use \"ollama pull <model>\" to download models."
+  ngrok_auth_token:
+    field_name: "ngrok Auth Token"
+    env_var: "NGROK_AUTH_TOKEN"
+    field_type: "str"
+    required: true
+    placeholder: "ngrok_..."
+    help_text: "Your ngrok authentication token. You can get your token from https://dashboard.ngrok.com/get-started/your-authtoken."
+    password: true

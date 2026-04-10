@@ -10,15 +10,53 @@ setup: |
   if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
   if [ "$(uname)" != "Darwin" ]; then $SUDO apt-get update && $SUDO apt-get install -y pciutils lshw; fi
 run: |
+  set -uo pipefail
+
+  # Start ollama and verify it launched
   export OLLAMA_HOST=0.0.0.0:11434
   ollama serve > /tmp/ollama.log 2>&1 &
+  OLLAMA_PID=$!
   sleep 3
-  ollama pull $MODEL_NAME > /tmp/ollama-pull.log 2>&1 &
-  sleep 5
+  if ! kill -0 $OLLAMA_PID 2>/dev/null; then
+    echo "ERROR: Ollama failed to start" >&2
+    cat /tmp/ollama.log >&2
+    exit 1
+  fi
+
+  # Pull model (foreground so failures are caught by pipefail)
+  ollama pull $MODEL_NAME 2>&1 | tee /tmp/ollama-pull.log
+
+  # Start gradio and verify it launched
   python -c "import gradio; print('gradio found at:', gradio.__file__)" 2>&1 || echo "gradio NOT found in run python"
   OLLAMA_BASE_URL=http://127.0.0.1:11434 MODEL_NAME=$MODEL_NAME python ~/inference-ollama-gradio-chat/gradio_chat.py > /tmp/gradio.log 2>&1 &
+  GRADIO_PID=$!
   sleep 5
-  tail -f /tmp/ollama.log /tmp/ollama-pull.log /tmp/gradio.log /tmp/ngrok.log
+  if ! kill -0 $GRADIO_PID 2>/dev/null; then
+    echo "ERROR: Gradio failed to start" >&2
+    cat /tmp/gradio.log >&2
+    exit 1
+  fi
+
+  # Stream logs in background
+  tail -f /tmp/ollama.log /tmp/ollama-pull.log /tmp/gradio.log /tmp/ngrok.log 2>/dev/null &
+  TAIL_PID=$!
+
+  # Monitor loop: check both processes every 5 seconds
+  while true; do
+    if ! kill -0 $OLLAMA_PID 2>/dev/null; then
+      echo "ERROR: Ollama process died unexpectedly" >&2
+      tail -20 /tmp/ollama.log >&2
+      kill $TAIL_PID 2>/dev/null
+      exit 1
+    fi
+    if ! kill -0 $GRADIO_PID 2>/dev/null; then
+      echo "ERROR: Gradio process died unexpectedly" >&2
+      tail -20 /tmp/gradio.log >&2
+      kill $TAIL_PID 2>/dev/null
+      exit 1
+    fi
+    sleep 5
+  done
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

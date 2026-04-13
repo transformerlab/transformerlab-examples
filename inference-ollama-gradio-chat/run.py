@@ -29,6 +29,10 @@ def _line_prefix(path: pathlib.Path) -> str:
 
 
 def _dump_log(path: pathlib.Path) -> None:
+    """
+    If a subprocess fails, dump it's log.
+    Report if the log doesn't exist yet.
+    """
     try:
         text = path.read_text(encoding="utf-8", errors="replace").strip()
         if text:
@@ -36,10 +40,14 @@ def _dump_log(path: pathlib.Path) -> None:
             print(text, file=sys.stderr, flush=True)
             print(f"=== END {path.name} ===", file=sys.stderr, flush=True)
     except FileNotFoundError:
+        print("Log file not found:", path.name)
         pass
 
 
 def _check_proc(proc: subprocess.Popen, name: str, log_path: pathlib.Path) -> None:
+    """
+    Check if a process has exited and, if so, output logs and return.
+    """
     if proc.poll() is not None:
         print(
             f"ERROR: {name} failed (exit code {proc.returncode})",

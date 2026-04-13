@@ -51,6 +51,7 @@ def main() -> None:
                 "--port=8888",
                 "--no-browser",
                 "--allow-root",
+                "--NotebookApp.base_url=''",
                 "--NotebookApp.token=",
                 "--NotebookApp.password=",
                 f"--notebook-dir={os.path.expanduser('~')}",

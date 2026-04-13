@@ -49,7 +49,6 @@ def _check_proc(proc: subprocess.Popen, name: str, log_path: pathlib.Path) -> No
     Check if a process has exited and, if so, output logs and return.
     """
     rc = proc.poll()
-    print(f"[DEBUG] _check_proc {name}: poll()={rc}, pid={proc.pid}", flush=True)
     if rc is not None:
         print(
             f"ERROR: {name} failed (exit code {rc})",

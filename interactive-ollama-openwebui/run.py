@@ -51,8 +51,6 @@ def main() -> None:
 
     _touch_logs()
 
-    openwebui_bin = os.path.expanduser("~/ollama-venv/bin/open-webui")
-
     with open("/tmp/ollama.log", "w", encoding="utf-8") as ollama_log:
         ollama_process = subprocess.Popen(["ollama", "serve"], stdout=ollama_log, stderr=subprocess.STDOUT, env=env)
     time.sleep(3)
@@ -68,7 +66,7 @@ def main() -> None:
     webui_env["WEBUI_AUTH"] = "false"
     with open("/tmp/openwebui.log", "w", encoding="utf-8") as webui_log:
         webui_process = subprocess.Popen(
-            [openwebui_bin, "serve", "--host", "0.0.0.0", "--port", "8080"],
+            ["open-webui", "serve", "--host", "0.0.0.0", "--port", "8080"],
             stdout=webui_log,
             stderr=subprocess.STDOUT,
             env=webui_env,

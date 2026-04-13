@@ -24,11 +24,3 @@ parameters:
     required: true
     placeholder: "e.g. llama2, mistral, codellama"
     help_text: "Ollama model name (e.g. llama2, mistral, codellama). Use \"ollama pull <model>\" to download models."
-  ngrok_auth_token:
-    field_name: "ngrok Auth Token"
-    env_var: "NGROK_AUTH_TOKEN"
-    field_type: "str"
-    required: true
-    placeholder: "ngrok_..."
-    help_text: "Your ngrok authentication token. You can get your token from https://dashboard.ngrok.com/get-started/your-authtoken."
-    password: true

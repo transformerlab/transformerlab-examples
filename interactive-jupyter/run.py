@@ -1,4 +1,4 @@
-"""Launch Jupyter Lab and ngrok, then stream logs."""
+"""Launch Jupyter Lab and stream logs."""
 
 from __future__ import annotations
 
@@ -41,9 +41,6 @@ def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
 
 def main() -> None:
     _touch_logs()
-    ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "")
-    if ngrok_auth_token:
-        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=True)
 
     with open("/tmp/jupyter.log", "w", encoding="utf-8") as jupyter_log:
         jupyter_process = subprocess.Popen(
@@ -63,11 +60,6 @@ def main() -> None:
         )
     time.sleep(3)
     _ensure_running(jupyter_process, "jupyter lab")
-
-    with open("/tmp/ngrok.log", "w", encoding="utf-8") as ngrok_log:
-        ngrok_process = subprocess.Popen(["ngrok", "http", "8888", "--log=stdout"], stdout=ngrok_log, stderr=subprocess.STDOUT)
-    time.sleep(1)
-    _ensure_running(ngrok_process, "ngrok http 8888")
 
     _tail_forever()
 

@@ -10,11 +10,3 @@ run: |
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:
-  ngrok_auth_token:
-    field_name: "ngrok Auth Token"
-    env_var: "NGROK_AUTH_TOKEN"
-    field_type: "str"
-    required: true
-    placeholder: "ngrok_..."
-    help_text: "Your ngrok authentication token. Note: You may need to add a payment method to your ngrok account (it won't be charged, but it's necessary for SSH connections). You can get your token from https://dashboard.ngrok.com/get-started/your-authtoken."
-    password: true

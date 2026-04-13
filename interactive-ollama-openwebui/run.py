@@ -1,4 +1,4 @@
-"""Launch Ollama + Open WebUI + ngrok and stream logs."""
+"""Launch Ollama + Open WebUI and stream logs."""
 
 from __future__ import annotations
 
@@ -46,16 +46,12 @@ def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
 
 def main() -> None:
     model_name = os.environ.get("MODEL_NAME", "llama2")
-    ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "")
     env = os.environ.copy()
     env["OLLAMA_HOST"] = "0.0.0.0:11434"
 
     _touch_logs()
-    if ngrok_auth_token:
-        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=True)
 
     openwebui_bin = os.path.expanduser("~/ollama-venv/bin/open-webui")
-    ngrok_config = os.path.expanduser("~/ngrok-ollama.yml")
 
     with open("/tmp/ollama.log", "w", encoding="utf-8") as ollama_log:
         ollama_process = subprocess.Popen(["ollama", "serve"], stdout=ollama_log, stderr=subprocess.STDOUT, env=env)
@@ -79,32 +75,6 @@ def main() -> None:
         )
     time.sleep(5)
     _ensure_running(webui_process, "Open WebUI")
-
-    pathlib.Path(ngrok_config).write_text(
-        "\n".join(
-            [
-                "version: 2",
-                f"authtoken: {ngrok_auth_token}",
-                "tunnels:",
-                "  ollama:",
-                "    proto: http",
-                "    addr: 11434",
-                "  openwebui:",
-                "    proto: http",
-                "    addr: 8080",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    with open("/tmp/ngrok.log", "w", encoding="utf-8") as ngrok_log:
-        ngrok_process = subprocess.Popen(
-            ["ngrok", "start", "--all", "--config", ngrok_config, "--log=stdout"],
-            stdout=ngrok_log,
-            stderr=subprocess.STDOUT,
-        )
-    time.sleep(1)
-    _ensure_running(ngrok_process, "ngrok tunnels")
 
     _tail_forever()
 

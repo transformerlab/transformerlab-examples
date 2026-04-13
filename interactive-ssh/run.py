@@ -1,4 +1,4 @@
-"""Launch SSH ngrok tunnel and stream logs."""
+"""Launch SSH tunnel and stream logs."""
 
 from __future__ import annotations
 
@@ -34,17 +34,8 @@ def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
 
 
 def main() -> None:
-    ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "")
-    if ngrok_auth_token:
-        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=True)
-
     username = getpass.getuser() or os.path.basename(os.path.expanduser("~"))
     print(f"USER_ID={username}", flush=True)
-
-    with open(LOG_PATH, "w", encoding="utf-8") as ngrok_log:
-        ngrok_process = subprocess.Popen(["ngrok", "tcp", "22", "--log=stdout"], stdout=ngrok_log, stderr=subprocess.STDOUT)
-    time.sleep(1)
-    _ensure_running(ngrok_process, "ngrok tcp 22")
 
     _tail_forever(LOG_PATH)
 

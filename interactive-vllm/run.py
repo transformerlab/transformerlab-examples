@@ -1,4 +1,4 @@
-"""Launch vLLM + Open WebUI + ngrok and stream logs."""
+"""Launch vLLM + Open WebUI and stream logs."""
 
 from __future__ import annotations
 
@@ -46,16 +46,12 @@ def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
 def main() -> None:
     model_name = os.environ.get("MODEL_NAME", "meta-llama/Llama-2-7b-chat-hf")
     tp_size = os.environ.get("TP_SIZE", "1")
-    ngrok_auth_token = os.environ.get("NGROK_AUTH_TOKEN", "")
     env = os.environ.copy()
 
     _touch_logs()
-    if ngrok_auth_token:
-        subprocess.run(["ngrok", "config", "add-authtoken", ngrok_auth_token], check=True)
 
     vllm_python = os.path.expanduser("~/vllm-venv/bin/python")
     openwebui_bin = os.path.expanduser("~/vllm-venv/bin/open-webui")
-    ngrok_config = os.path.expanduser("~/ngrok-vllm.yml")
 
     with open("/tmp/vllm.log", "w", encoding="utf-8") as vllm_log:
         vllm_process = subprocess.Popen(
@@ -95,33 +91,6 @@ def main() -> None:
         )
     time.sleep(5)
     _ensure_running(webui_process, "Open WebUI")
-
-    pathlib.Path(ngrok_config).write_text(
-        "\n".join(
-            [
-                "version: 2",
-                f"authtoken: {ngrok_auth_token}",
-                "tunnels:",
-                "  vllm:",
-                "    proto: http",
-                "    addr: 8000",
-                "  openwebui:",
-                "    proto: http",
-                "    addr: 8080",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    with open("/tmp/ngrok.log", "w", encoding="utf-8") as ngrok_log:
-        ngrok_process = subprocess.Popen(
-            ["ngrok", "start", "--all", "--config", ngrok_config, "--log=stdout"],
-            stdout=ngrok_log,
-            stderr=subprocess.STDOUT,
-        )
-    time.sleep(1)
-    _ensure_running(ngrok_process, "ngrok tunnels")
 
     _tail_forever()
 

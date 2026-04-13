@@ -41,7 +41,11 @@ def _dump_log(path: pathlib.Path) -> None:
 
 def _check_proc(proc: subprocess.Popen, name: str, log_path: pathlib.Path) -> None:
     if proc.poll() is not None:
-        print(f"ERROR: {name} failed (exit code {proc.returncode})", file=sys.stderr, flush=True)
+        print(
+            f"ERROR: {name} failed (exit code {proc.returncode})",
+            file=sys.stderr,
+            flush=True,
+        )
         _dump_log(log_path)
         sys.exit(1)
 
@@ -93,7 +97,10 @@ def main() -> None:
 
     pull_log = open("/tmp/ollama-pull.log", "w", encoding="utf-8")
     pull_proc = subprocess.Popen(
-        ["ollama", "pull", model_name], stdout=pull_log, stderr=subprocess.STDOUT, env=env
+        ["ollama", "pull", model_name],
+        stdout=pull_log,
+        stderr=subprocess.STDOUT,
+        env=env,
     )
     time.sleep(5)
     _check_proc(pull_proc, "Ollama pull", pathlib.Path("/tmp/ollama-pull.log"))
@@ -120,10 +127,12 @@ def main() -> None:
     time.sleep(5)
     _check_proc(gradio_proc, "Gradio", pathlib.Path("/tmp/gradio.log"))
 
-    _tail_and_monitor({
-        "Ollama": (ollama_proc, pathlib.Path("/tmp/ollama.log")),
-        "Gradio": (gradio_proc, pathlib.Path("/tmp/gradio.log")),
-    })
+    _tail_and_monitor(
+        {
+            "Ollama": (ollama_proc, pathlib.Path("/tmp/ollama.log")),
+            "Gradio": (gradio_proc, pathlib.Path("/tmp/gradio.log")),
+        }
+    )
 
 
 if __name__ == "__main__":

@@ -7,10 +7,13 @@ resources:
 setup: |
   if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
   export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  uv venv --python 3.11 ~/ollama-openwebui-venv
+  source ~/ollama-openwebui-venv/bin/activate
   uv pip install open-webui
   if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
   if [ "$(uname)" != "Darwin" ]; then $SUDO apt-get update && $SUDO apt-get install -y pciutils lshw; fi
 run: |
+  source ~/ollama-openwebui-venv/bin/activate
   python ~/interactive-ollama-openwebui/run.py
 envs:
   PYTHONUNBUFFERED: "1"

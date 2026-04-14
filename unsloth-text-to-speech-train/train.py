@@ -594,6 +594,7 @@ def train_model():
                     report_to="wandb" if training_config.get("log_to_wandb", True) else "none",
                     output_dir=training_config["output_dir"],
                     resume_from_checkpoint=checkpoint if checkpoint else None,
+                    remove_unused_columns=False,
                 ),
             )
             lab.log("Trainer setup complete.")

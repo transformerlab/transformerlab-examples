@@ -153,6 +153,10 @@ class CsmAudioTrainer(AudioTrainerBase):
                 return None
 
             value = model_inputs[key][0]
+            # Detach and clone tensors to avoid in-place operation issues
+            # Convert to contiguous CPU tensors to prevent view-related issues
+            if isinstance(value, torch.Tensor):
+                value = value.detach().clone().cpu()
             processed_example[key] = value
 
         if not all(
@@ -341,9 +345,9 @@ class OrpheusAudioTrainer(AudioTrainerBase):
                 attention_mask = [1] * len(input_ids)
 
             return {
-                "input_ids": input_ids,
-                "labels": labels,
-                "attention_mask": attention_mask,
+                "input_ids": torch.tensor(input_ids, dtype=torch.long),
+                "labels": torch.tensor(labels, dtype=torch.long),
+                "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
             }
 
         except Exception as e:

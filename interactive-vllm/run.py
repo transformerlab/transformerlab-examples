@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import pathlib
 import subprocess
+import sys
 import time
 
 LOG_FILES = [
@@ -13,6 +14,8 @@ LOG_FILES = [
     pathlib.Path("/tmp/ngrok.log"),
 ]
 
+CHECK_INTERVAL = 5
+
 
 def _touch_logs() -> None:
     for path in LOG_FILES:
@@ -20,27 +23,70 @@ def _touch_logs() -> None:
         path.touch(exist_ok=True)
 
 
-def _tail_forever() -> None:
+def _line_prefix(path: pathlib.Path) -> str:
+    return f"[{path.name}] "
+
+
+def _dump_log(path: pathlib.Path) -> None:
+    """
+    If a subprocess fails, dump its log.
+    Report if the log doesn't exist yet.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").strip()
+        if text:
+            print(f"=== START {path.name} ===", file=sys.stderr, flush=True)
+            print(text, file=sys.stderr, flush=True)
+            print(f"=== END {path.name} ===", file=sys.stderr, flush=True)
+    except FileNotFoundError:
+        print("Log file not found:", path.name)
+        pass
+
+
+def _check_proc(proc: subprocess.Popen, name: str, log_path: pathlib.Path) -> None:
+    """
+    Check if a process has exited and, if so, output logs and return.
+    """
+    rc = proc.poll()
+    if rc is not None:
+        print(
+            f"ERROR: {name} failed (exit code {rc})",
+            file=sys.stderr,
+            flush=True,
+        )
+        _dump_log(log_path)
+        sys.exit(1)
+
+
+def _tail_and_monitor(procs: dict[str, tuple[subprocess.Popen, pathlib.Path]]) -> None:
     offsets = {path: 0 for path in LOG_FILES}
+    last_check = time.monotonic()
+
     while True:
         saw_data = False
         for path in LOG_FILES:
-            with path.open("r", encoding="utf-8", errors="replace") as handle:
-                handle.seek(offsets[path])
-                chunk = handle.read()
-                offsets[path] = handle.tell()
+            try:
+                with path.open("r", encoding="utf-8", errors="replace") as handle:
+                    handle.seek(offsets[path])
+                    chunk = handle.read()
+                    offsets[path] = handle.tell()
+            except FileNotFoundError:
+                continue
+
             if chunk:
                 saw_data = True
+                prefix = _line_prefix(path)
                 for line in chunk.splitlines():
-                    print(f"[{path.name}] {line}", flush=True)
+                    print(f"{prefix}{line}", flush=True)
+
+        now = time.monotonic()
+        if now - last_check >= CHECK_INTERVAL:
+            last_check = now
+            for name, (proc, log_path) in procs.items():
+                _check_proc(proc, name, log_path)
+
         if not saw_data:
             time.sleep(0.25)
-
-
-def _ensure_running(process: subprocess.Popen[bytes], name: str) -> None:
-    code = process.poll()
-    if code is not None:
-        raise RuntimeError(f"{name} exited early with code {code}")
 
 
 def main() -> None:
@@ -53,46 +99,51 @@ def main() -> None:
     vllm_python = os.path.expanduser("~/vllm-venv/bin/python")
     openwebui_bin = os.path.expanduser("~/vllm-venv/bin/open-webui")
 
-    with open("/tmp/vllm.log", "w", encoding="utf-8") as vllm_log:
-        vllm_process = subprocess.Popen(
-            [
-                vllm_python,
-                "-u",
-                "-m",
-                "vllm.entrypoints.openai.api_server",
-                "--model",
-                model_name,
-                "--tensor-parallel-size",
-                str(tp_size),
-                "--host",
-                "0.0.0.0",
-                "--port",
-                "8000",
-                "--gpu-memory-utilization",
-                "0.9",
-            ],
-            stdout=vllm_log,
-            stderr=subprocess.STDOUT,
-            env=env,
-        )
+    vllm_log = open("/tmp/vllm.log", "w", encoding="utf-8")
+    vllm_process = subprocess.Popen(
+        [
+            vllm_python,
+            "-u",
+            "-m",
+            "vllm.entrypoints.openai.api_server",
+            "--model",
+            model_name,
+            "--tensor-parallel-size",
+            str(tp_size),
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000",
+            "--gpu-memory-utilization",
+            "0.9",
+        ],
+        stdout=vllm_log,
+        stderr=subprocess.STDOUT,
+        env=env,
+    )
     time.sleep(10)
-    _ensure_running(vllm_process, "vLLM API server")
+    _check_proc(vllm_process, "vLLM API server", pathlib.Path("/tmp/vllm.log"))
 
     openwebui_env = env.copy()
     openwebui_env["OPENAI_API_BASE_URL"] = "http://127.0.0.1:8000/v1"
     openwebui_env["OPENAI_API_KEY"] = "dummy"
     openwebui_env["WEBUI_AUTH"] = "false"
-    with open("/tmp/openwebui.log", "w", encoding="utf-8") as webui_log:
-        webui_process = subprocess.Popen(
-            [openwebui_bin, "serve", "--host", "0.0.0.0", "--port", "8080"],
-            stdout=webui_log,
-            stderr=subprocess.STDOUT,
-            env=openwebui_env,
-        )
+    webui_log = open("/tmp/openwebui.log", "w", encoding="utf-8")
+    webui_process = subprocess.Popen(
+        [openwebui_bin, "serve", "--host", "0.0.0.0", "--port", "8080"],
+        stdout=webui_log,
+        stderr=subprocess.STDOUT,
+        env=openwebui_env,
+    )
     time.sleep(5)
-    _ensure_running(webui_process, "Open WebUI")
+    _check_proc(webui_process, "Open WebUI", pathlib.Path("/tmp/openwebui.log"))
 
-    _tail_forever()
+    _tail_and_monitor(
+        {
+            "vLLM": (vllm_process, pathlib.Path("/tmp/vllm.log")),
+            "Open WebUI": (webui_process, pathlib.Path("/tmp/openwebui.log")),
+        }
+    )
 
 
 if __name__ == "__main__":

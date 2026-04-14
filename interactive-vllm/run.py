@@ -73,7 +73,7 @@ def _check_openwebui_health(last_health_check: float, health_logged: bool) -> tu
         req = urllib.request.Request(HEALTH_CHECK_URL, method="GET")
         with urllib.request.urlopen(req, timeout=5) as resp:
             if resp.status == 200:
-                msg = "Local OpenWebUI URL: http://localhost:8080\n"
+                msg = "Local Open WebUI URL: http://localhost:8080\n"
                 with OPENWEBUI_LOG.open("a", encoding="utf-8") as f:
                     f.write(msg)
                 return now, True

@@ -1,0 +1,13 @@
+name: jupyter
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: interactive-jupyter
+resources:
+  cpus: 2
+  memory: 4
+setup: |
+  pip install jupyter
+run: |
+  python ~/interactive-jupyter/run.py
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:

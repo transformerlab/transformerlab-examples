@@ -1,0 +1,39 @@
+name: vllm
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: interactive-vllm
+resources:
+  cpus: 2
+  memory: 8
+setup: |
+  if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  uv venv ~/vllm-venv --seed --python 3.11
+  . ~/vllm-venv/bin/activate
+  uv pip install "vllm>=0.13.0" "transformers>=4.57.3" qwen-vl-utils==0.0.14 open-webui
+run: |
+  python ~/interactive-vllm/run.py
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:
+  model_name:
+    field_name: "Model Name"
+    env_var: "MODEL_NAME"
+    field_type: "str"
+    required: true
+    placeholder: "e.g. meta-llama/Llama-2-7b-chat-hf"
+    help_text: "HuggingFace model identifier"
+  tp_size:
+    field_name: "Tensor Parallel Size"
+    env_var: "TP_SIZE"
+    field_type: "integer"
+    required: true
+    placeholder: "1"
+    help_text: "Number of GPUs for tensor parallelism (default: 1)"
+  hf_token:
+    field_name: "HuggingFace Token"
+    env_var: "HF_TOKEN"
+    field_type: "str"
+    required: false
+    placeholder: "hf_..."
+    help_text: "Optional: Required for private/gated models"
+    password: true

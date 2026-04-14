@@ -8,7 +8,7 @@ setup: |
   uv pip install --upgrade gradio
   uv pip install openai "mlx-lm>=0.28.3"
 run: |
-  MODEL_NAME=$MODEL_NAME python ~/inference-mlx-gradio-chat/gradio_chat.py
+  python ~/inference-mlx-gradio-chat/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

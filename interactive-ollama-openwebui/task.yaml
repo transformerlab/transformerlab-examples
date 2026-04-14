@@ -1,16 +1,17 @@
-name: ollama-gradio-chat
+name: ollama-open-webui
 github_repo_url: https://github.com/transformerlab/transformerlab-examples
-github_repo_dir: inference-ollama-gradio-chat
+github_repo_dir: interactive-ollama-openwebui
 resources:
   cpus: 2
-  memory: 4
+  memory: 8
 setup: |
-  uv pip install --upgrade gradio openai
-  python -c "import gradio; print('gradio installed at:', gradio.__file__)"
+  if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi
+  export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+  uv pip install open-webui
   if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
   if [ "$(uname)" != "Darwin" ]; then $SUDO apt-get update && $SUDO apt-get install -y pciutils lshw; fi
 run: |
-  python ~/inference-ollama-gradio-chat/run.py
+  python ~/interactive-ollama-openwebui/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:
@@ -20,4 +21,4 @@ parameters:
     field_type: "str"
     required: true
     placeholder: "e.g. llama2, mistral, codellama"
-    help_text: "Ollama model name (e.g. llama2, mistral, codellama)."
+    help_text: "Ollama model name (e.g. llama2, mistral, codellama). Use \"ollama pull <model>\" to download models."

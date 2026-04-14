@@ -34,9 +34,9 @@ def _dump_log(path: pathlib.Path) -> None:
             print(f"=== START {path.name} ===", file=sys.stderr, flush=True)
             print(text, file=sys.stderr, flush=True)
             print(f"=== END {path.name} ===", file=sys.stderr, flush=True)
-    except FileNotFoundError:
-        print("Log file not found:", path.name)
-        pass
+    except Exception as e:
+        print(f"Error reading log file {path.name}: {e}", file=sys.stderr)
+
 
 
 def _check_proc(proc: subprocess.Popen, name: str, log_path: pathlib.Path) -> None:

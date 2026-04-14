@@ -7,6 +7,8 @@ import pathlib
 import subprocess
 import sys
 import time
+import urllib.request
+import urllib.error
 
 LOG_FILES = [
     pathlib.Path("/tmp/vllm.log"),
@@ -58,9 +60,33 @@ def _check_proc(proc: subprocess.Popen, name: str, log_path: pathlib.Path) -> No
         sys.exit(1)
 
 
+HEALTH_CHECK_URL = "http://localhost:8080/health"
+HEALTH_CHECK_INTERVAL = 10
+OPENWEBUI_LOG = pathlib.Path("/tmp/openwebui.log")
+
+
+def _check_openwebui_health(last_health_check: float, health_logged: bool) -> tuple[float, bool]:
+    now = time.monotonic()
+    if health_logged or now - last_health_check < HEALTH_CHECK_INTERVAL:
+        return last_health_check, health_logged
+    try:
+        req = urllib.request.Request(HEALTH_CHECK_URL, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                msg = "Local Open WebUI URL: http://localhost:8080\n"
+                with OPENWEBUI_LOG.open("a", encoding="utf-8") as f:
+                    f.write(msg)
+                return now, True
+    except (urllib.error.URLError, OSError):
+        pass
+    return now, False
+
+
 def _tail_and_monitor(procs: dict[str, tuple[subprocess.Popen, pathlib.Path]]) -> None:
     offsets = {path: 0 for path in LOG_FILES}
     last_check = time.monotonic()
+    last_health_check = time.monotonic()
+    health_logged = False
 
     while True:
         saw_data = False
@@ -84,6 +110,8 @@ def _tail_and_monitor(procs: dict[str, tuple[subprocess.Popen, pathlib.Path]]) -
             last_check = now
             for name, (proc, log_path) in procs.items():
                 _check_proc(proc, name, log_path)
+
+        last_health_check, health_logged = _check_openwebui_health(last_health_check, health_logged)
 
         if not saw_data:
             time.sleep(0.25)

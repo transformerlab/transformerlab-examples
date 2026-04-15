@@ -1,4 +1,4 @@
-from unsloth import is_bfloat16_supported
+from unsloth import is_bfloat16_supported, FastLanguageModel
 import os
 import torch
 from datetime import datetime
@@ -130,60 +130,83 @@ class LabCallback(TrainerCallback):
         lab.update_progress(95)
 
 
-def _decode_orpheus_audio(generated_ids, snac_model, device):
-    """Decode Orpheus tokens back to audio using SNAC codec."""
-    END_OF_SPEECH = 128258
-    START_OF_SPEECH = 128257
+def _decode_orpheus_audio(generated_ids, snac_model, device="cpu"):
+    """
+    Decode Orpheus tokens back to audio using SNAC codec.
+    
+    This follows the exact logic from the Unsloth Orpheus Colab notebook:
+    1. Find the last occurrence of token 128257 (start-of-audio marker)
+    2. Crop everything after it
+    3. Remove token 128258 (end-of-speech)
+    4. Subtract 128266 offset from all tokens
+    5. Redistribute across 3 SNAC layers (7 codes per group)
+    6. Decode with SNAC
+    """
+    token_to_find = 128257   # Start of audio / SOA marker
+    token_to_remove = 128258 # End of speech
     CODE_TOKEN_OFFSET = 128266
     
     try:
-        # Extract audio tokens (find the last occurrence of START_OF_SPEECH)
-        start_indices = (generated_ids == START_OF_SPEECH).nonzero(as_tuple=True)
-        if len(start_indices[1]) > 0:
-            last_start_idx = start_indices[1][-1].item()
-            cropped_tensor = generated_ids[:, last_start_idx + 1:]
+        # Step 1: Find last occurrence of the start-of-audio token and crop after it
+        token_indices = (generated_ids == token_to_find).nonzero(as_tuple=True)
+        
+        if len(token_indices[1]) > 0:
+            last_occurrence_idx = token_indices[1][-1].item()
+            cropped_tensor = generated_ids[:, last_occurrence_idx + 1:]
         else:
             cropped_tensor = generated_ids
         
-        # Remove end-of-speech tokens
-        processed_tokens = [row[row != END_OF_SPEECH] for row in cropped_tensor]
-        row = processed_tokens[0]
+        # Step 2: Remove end-of-speech tokens from each row
+        processed_rows = []
+        for row in cropped_tensor:
+            masked_row = row[row != token_to_remove]
+            processed_rows.append(masked_row)
         
-        # Trim to multiple of 7 (SNAC layer structure: 7 codes per group)
-        row_length = row.size(0)
-        new_length = (row_length // 7) * 7
-        trimmed_row = row[:new_length]
+        # Step 3: Process each row into code lists
+        code_lists = []
+        for row in processed_rows:
+            row_length = row.size(0)
+            new_length = (row_length // 7) * 7
+            trimmed_row = row[:new_length]
+            # Subtract the offset to get raw SNAC codes
+            trimmed_row = [t.item() - CODE_TOKEN_OFFSET for t in trimmed_row]
+            code_lists.append(trimmed_row)
         
-        # Convert to codec codes by removing the offset
-        codec_codes = [token.item() - CODE_TOKEN_OFFSET for token in trimmed_row]
+        if not code_lists or len(code_lists[0]) == 0:
+            lab.log("⚠️  No audio tokens found in generated output")
+            return None
         
-        # Redistribute across SNAC layers (7 codes per group):
-        # Layer 1: 1 token per group
-        # Layer 2: 2 tokens per group with offsets
-        # Layer 3: 4 tokens per group with offsets
-        layer_1, layer_2, layer_3 = [], [], []
-        for i in range((len(codec_codes) + 1) // 7):
-            base_idx = 7 * i
-            if base_idx >= len(codec_codes):
-                break
-                
-            layer_1.append(codec_codes[base_idx])
-            layer_2.append(codec_codes[base_idx + 1] - 4096)
-            layer_2.append(codec_codes[base_idx + 4] - 4 * 4096)
-            layer_3.append(codec_codes[base_idx + 2] - 2 * 4096)
-            layer_3.append(codec_codes[base_idx + 3] - 3 * 4096)
-            layer_3.append(codec_codes[base_idx + 5] - 5 * 4096)
-            layer_3.append(codec_codes[base_idx + 6] - 6 * 4096)
+        # Step 4: Redistribute codes across SNAC layers (matching Colab exactly)
+        def redistribute_codes(code_list):
+            layer_1 = []
+            layer_2 = []
+            layer_3 = []
+            for i in range((len(code_list) + 1) // 7):
+                layer_1.append(code_list[7 * i])
+                layer_2.append(code_list[7 * i + 1] - 4096)
+                layer_3.append(code_list[7 * i + 2] - (2 * 4096))
+                layer_3.append(code_list[7 * i + 3] - (3 * 4096))
+                layer_2.append(code_list[7 * i + 4] - (4 * 4096))
+                layer_3.append(code_list[7 * i + 5] - (5 * 4096))
+                layer_3.append(code_list[7 * i + 6] - (6 * 4096))
+            codes = [
+                torch.tensor(layer_1).unsqueeze(0),
+                torch.tensor(layer_2).unsqueeze(0),
+                torch.tensor(layer_3).unsqueeze(0),
+            ]
+            audio_hat = snac_model.decode(codes)
+            return audio_hat
         
-        # Convert to tensors and decode using SNAC
-        codes = [
-            torch.tensor(layer_1, device=device).unsqueeze(0),
-            torch.tensor(layer_2, device=device).unsqueeze(0),
-            torch.tensor(layer_3, device=device).unsqueeze(0),
-        ]
+        # Step 5: Decode each code list
+        my_samples = []
+        for code_list in code_lists:
+            samples = redistribute_codes(code_list)
+            my_samples.append(samples)
         
-        audio = snac_model.decode(codes).squeeze().to(torch.float32).cpu().detach().numpy()
+        # Return the first sample as numpy array
+        audio = my_samples[0].detach().squeeze().to("cpu").numpy()
         return audio
+        
     except Exception as e:
         lab.log(f"⚠️  Error decoding Orpheus audio: {e}")
         import traceback
@@ -191,26 +214,24 @@ def _decode_orpheus_audio(generated_ids, snac_model, device):
         return None
 
 
-def generate_audio_sample(model, processor, text, sampling_rate, output_path, device="cuda", model_architecture="OrpheusForConditionalGeneration"):
+def generate_audio_sample(model, processor, text, sampling_rate, output_path, device="cuda", model_architecture="OrpheusForConditionalGeneration", snac_model=None):
     """
     Generate a synthetic audio sample from text using the trained model.
     
     Args:
         model: The TTS model (already loaded)
-        processor: The model's processor
+        processor: The model's processor/tokenizer
         text: Text to synthesize
         sampling_rate: Audio sampling rate
         output_path: Path to save the audio file
         device: Device to use (cuda or cpu)
         model_architecture: The model architecture type
+        snac_model: Pre-loaded SNAC model (for Orpheus). If None, one will be created.
     
     Returns:
         True if successful, False otherwise
     """
     try:
-        # Ensure model is in eval mode
-        model.eval()
-        
         with torch.no_grad():
             # Tokenize input text
             if model_architecture == "CsmForConditionalGeneration":
@@ -227,26 +248,46 @@ def generate_audio_sample(model, processor, text, sampling_rate, output_path, de
                 audio = generated[0].to(torch.float32).cpu().numpy()
                 
             else:  # OrpheusForConditionalGeneration
-                # Tokenize using processor
-                text_tokens = processor(text, return_tensors="pt")["input_ids"].to(device)
+                # Enable fast inference mode (Unsloth optimization)
+                FastLanguageModel.for_inference(model)
                 
-                # Initialize SNAC model for decoding
-                snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz").to(device)
+                # Initialize SNAC model for decoding (on CPU to save GPU VRAM)
+                if snac_model is None:
+                    snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz")
+                snac_model = snac_model.to("cpu")
                 
-                # Generate with proper Orpheus parameters
-                generated = model.generate(
-                    text_tokens,
-                    max_new_tokens=10240,
-                    eos_token_id=128258,  # END_OF_SPEECH
-                    use_cache=True,
-                    repetition_penalty=1.1,
+                # Build Orpheus-style prompt with special tokens
+                # Format: [SOH] [text_tokens] [EOT] [EOH]
+                # SOH = 128259 (start_of_human)
+                # EOT = 128009 (end_of_text)  
+                # EOH = 128260 (end_of_human)
+                # PAD = 128263
+                start_token = torch.tensor([[128259]], dtype=torch.int64)
+                end_tokens = torch.tensor([[128009, 128260]], dtype=torch.int64)
+                
+                input_ids = processor(text, return_tensors="pt").input_ids
+                modified_input_ids = torch.cat([start_token, input_ids, end_tokens], dim=1)
+                
+                # No padding needed for single prompt
+                input_ids_device = modified_input_ids.to(device)
+                attention_mask = torch.ones_like(input_ids_device)
+                
+                # Generate audio tokens
+                generated_ids = model.generate(
+                    input_ids=input_ids_device,
+                    attention_mask=attention_mask,
+                    max_new_tokens=1200,
                     do_sample=True,
-                    temperature=0.7,
+                    temperature=0.6,
                     top_p=0.95,
+                    repetition_penalty=1.1,
+                    num_return_sequences=1,
+                    eos_token_id=128258,
+                    use_cache=True,
                 )
                 
-                # Decode using SNAC codec
-                audio = _decode_orpheus_audio(generated, snac_model, device)
+                # Decode generated tokens to audio using the Colab's exact approach
+                audio = _decode_orpheus_audio(generated_ids, snac_model, "cpu")
                 if audio is None:
                     lab.log(f"⚠️  Failed to decode Orpheus audio")
                     return False
@@ -280,7 +321,8 @@ def generate_audio_sample(model, processor, text, sampling_rate, output_path, de
 
 
 def save_audio_samples(model_before, processor_before, model_after, processor_after, 
-                       text_sample, sampling_rate, output_dir, device="cuda", model_architecture="OrpheusForConditionalGeneration"):
+                       text_sample, sampling_rate, output_dir, device="cuda", model_architecture="OrpheusForConditionalGeneration",
+                       snac_model=None):
     """
     Generate and save before/after training audio samples.
     
@@ -294,6 +336,7 @@ def save_audio_samples(model_before, processor_before, model_after, processor_af
         output_dir: Directory to save samples
         device: Device to use
         model_architecture: The model architecture type
+        snac_model: Pre-loaded SNAC model (shared across calls to avoid reloading)
     
     Returns:
         Tuple of (before_audio_path, after_audio_path) or (None, None) if failed
@@ -309,7 +352,8 @@ def save_audio_samples(model_before, processor_before, model_after, processor_af
     lab.log("Generating pre-trained model sample...")
     before_success = generate_audio_sample(
         model_before, processor_before, text_sample, 
-        sampling_rate, before_audio_path, device, model_architecture
+        sampling_rate, before_audio_path, device, model_architecture,
+        snac_model=snac_model
     )
     
     if before_success:
@@ -322,7 +366,8 @@ def save_audio_samples(model_before, processor_before, model_after, processor_af
     lab.log("Generating fine-tuned model sample...")
     after_success = generate_audio_sample(
         model_after, processor_after, text_sample, 
-        sampling_rate, after_audio_path, device, model_architecture
+        sampling_rate, after_audio_path, device, model_architecture,
+        snac_model=snac_model
     )
     
     if after_success:
@@ -610,10 +655,43 @@ def train_model():
         # Train the model
         lab.log("Starting training...")
         try:
-            # Save pre-trained model reference for audio sample comparison
-            pretrained_model = model
-            pretrained_tokenizer = tokenizer
+            # Determine sample text for before/after comparison
+            sample_text = "Hello welcome to transformer lab, where we turn text into natural sounding speech"
+            if len(dataset) > 0:
+                try:
+                    sample_data = dataset[0]
+                    if training_config["_config"]["text_column_name"] in sample_data:
+                        sample_text = sample_data[training_config["_config"]["text_column_name"]]
+                        lab.log(f"Using dataset sample text: '{sample_text}'")
+                except Exception:
+                    lab.log("Using default sample text for audio generation")
             
+            # Generate "before training" audio sample BEFORE training starts
+            before_audio_path = os.path.join(training_config["output_dir"], "sample_before_training.wav")
+            lab.log("📊 Generating before-training audio sample...")
+            try:
+                # Get the SNAC model from the trainer if it's an Orpheus model
+                snac_model_ref = getattr(model_trainer, 'snac_model', None)
+                
+                generate_audio_sample(
+                    model, tokenizer, sample_text,
+                    training_config["_config"]["sampling_rate"],
+                    before_audio_path,
+                    training_config["_config"]["device"],
+                    training_config["_config"]["model_architecture"],
+                    snac_model=snac_model_ref,
+                )
+                if os.path.exists(before_audio_path) and os.path.getsize(before_audio_path) > 44:
+                    file_size = os.path.getsize(before_audio_path)
+                    lab.log(f"✅ Generated before-training sample: {before_audio_path} ({file_size} bytes)")
+                else:
+                    before_audio_path = None
+                    lab.log("⚠️  Before-training audio sample was empty or failed")
+            except Exception as e:
+                lab.log(f"⚠️  Could not generate before-training audio sample: {e}")
+                before_audio_path = None
+            
+            # Now run training
             trainer.train()
             lab.log("✅ Training completed successfully")
 
@@ -623,49 +701,48 @@ def train_model():
             tokenizer.save_pretrained(training_config["output_dir"])
             lab.log("✅ Model and tokenizer saved")
             
-            # Generate and save before/after training audio samples
-            lab.log("📊 Generating before/after training audio samples...")
+            # Generate "after training" audio sample AFTER training completes
+            after_audio_path = os.path.join(training_config["output_dir"], "sample_after_training.wav")
+            lab.log("📊 Generating after-training audio sample...")
             try:
-                # Use the specified sample text or a default one from the dataset
-                sample_text = "Hello welcome to transformer lab, where we turn text into natural sounding speech"
-                if len(dataset) > 0:
-                    try:
-                        sample_data = dataset[0]
-                        if training_config["_config"]["text_column_name"] in sample_data:
-                            sample_text = sample_data[training_config["_config"]["text_column_name"]]
-                            lab.log(f"Using dataset sample text: '{sample_text}'")
-                    except Exception:
-                        lab.log("Using default sample text for audio generation")
+                snac_model_ref = getattr(model_trainer, 'snac_model', None)
                 
-                before_audio, after_audio = save_audio_samples(
-                    model_before=pretrained_model,
-                    processor_before=pretrained_tokenizer,
-                    model_after=model,
-                    processor_after=tokenizer,
-                    text_sample=sample_text,
-                    sampling_rate=training_config["_config"]["sampling_rate"],
-                    output_dir=training_config["output_dir"],
-                    device=training_config["_config"]["device"],
-                    model_architecture=training_config["_config"]["model_architecture"]
+                generate_audio_sample(
+                    model, tokenizer, sample_text,
+                    training_config["_config"]["sampling_rate"],
+                    after_audio_path,
+                    training_config["_config"]["device"],
+                    training_config["_config"]["model_architecture"],
+                    snac_model=snac_model_ref,
                 )
-                
-                # Save audio samples as artifacts
-                if before_audio and os.path.exists(before_audio):
+                if os.path.exists(after_audio_path) and os.path.getsize(after_audio_path) > 44:
+                    file_size = os.path.getsize(after_audio_path)
+                    lab.log(f"✅ Generated after-training sample: {after_audio_path} ({file_size} bytes)")
+                else:
+                    after_audio_path = None
+                    lab.log("⚠️  After-training audio sample was empty or failed")
+            except Exception as e:
+                lab.log(f"⚠️  Could not generate after-training audio sample: {e}")
+                after_audio_path = None
+            
+            # Save audio samples as artifacts
+            try:
+                if before_audio_path and os.path.exists(before_audio_path):
                     before_artifact_path = lab.save_artifact(
-                        before_audio, 
+                        before_audio_path, 
                         "sample_before_training.wav"
                     )
                     lab.log(f"✅ Saved before-training audio artifact: {before_artifact_path}")
                 
-                if after_audio and os.path.exists(after_audio):
+                if after_audio_path and os.path.exists(after_audio_path):
                     after_artifact_path = lab.save_artifact(
-                        after_audio, 
+                        after_audio_path, 
                         "sample_after_training.wav"
                     )
                     lab.log(f"✅ Saved after-training audio artifact: {after_artifact_path}")
                     
             except Exception as e:
-                lab.log(f"⚠️  Could not generate audio samples: {e}")
+                lab.log(f"⚠️  Could not save audio artifacts: {e}")
                 import traceback
                 traceback.print_exc()
 

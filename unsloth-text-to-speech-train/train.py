@@ -1,4 +1,4 @@
-from unsloth import is_bfloat16_supported, FastLanguageModel
+from unsloth import is_bfloat16_supported, FastLanguageModel, FastModel
 import os
 import torch
 from datetime import datetime
@@ -235,17 +235,22 @@ def generate_audio_sample(model, processor, text, sampling_rate, output_path, de
         with torch.no_grad():
             # Tokenize input text
             if model_architecture == "CsmForConditionalGeneration":
-                inputs = processor(f"[0]{text}", add_special_tokens=True).to(device)
-                # Generate audio with proper parameters
-                generated = model.generate(
+                # Enable fast inference mode (Unsloth optimization)
+                FastModel.for_inference(model)
+                
+                # CSM generation following the Unsloth Colab notebook exactly:
+                # Use processor() with "[speaker_id]text" format and output_audio=True
+                speaker_id = 0
+                inputs = processor(f"[{speaker_id}]{text}", add_special_tokens=True).to(device)
+                
+                # Generate audio directly - output_audio=True makes model return waveform
+                audio_values = model.generate(
                     **inputs,
-                    max_new_tokens=1024,
-                    do_sample=True,
-                    temperature=0.7,
-                    top_p=0.95,
+                    max_new_tokens=125,  # 125 tokens = ~10 seconds of audio
+                    output_audio=True,
                 )
-                # For CSM models
-                audio = generated[0].to(torch.float32).cpu().numpy()
+                # audio_values[0] is the raw audio waveform when output_audio=True
+                audio = audio_values[0].to(torch.float32).cpu().numpy()
                 
             else:  # OrpheusForConditionalGeneration
                 # Enable fast inference mode (Unsloth optimization)
@@ -655,41 +660,56 @@ def train_model():
         # Train the model
         lab.log("Starting training...")
         try:
-            # Determine sample text for before/after comparison
-            sample_text = "Hello welcome to transformer lab, where we turn text into natural sounding speech"
+            # Define both sample texts for audio generation
+            default_sample_text = "Hello welcome to transformer lab, where we turn text into natural sounding speech"
+            dataset_sample_text = None
+            
             if len(dataset) > 0:
                 try:
                     sample_data = dataset[0]
                     if training_config["_config"]["text_column_name"] in sample_data:
-                        sample_text = sample_data[training_config["_config"]["text_column_name"]]
-                        lab.log(f"Using dataset sample text: '{sample_text}'")
+                        dataset_sample_text = sample_data[training_config["_config"]["text_column_name"]]
+                        lab.log(f"Using dataset sample text: '{dataset_sample_text}'")
                 except Exception:
-                    lab.log("Using default sample text for audio generation")
+                    lab.log("Could not extract dataset sample text")
             
-            # Generate "before training" audio sample BEFORE training starts
-            before_audio_path = os.path.join(training_config["output_dir"], "sample_before_training.wav")
-            lab.log("📊 Generating before-training audio sample...")
-            try:
-                # Get the SNAC model from the trainer if it's an Orpheus model
-                snac_model_ref = getattr(model_trainer, 'snac_model', None)
-                
-                generate_audio_sample(
-                    model, tokenizer, sample_text,
-                    training_config["_config"]["sampling_rate"],
-                    before_audio_path,
-                    training_config["_config"]["device"],
-                    training_config["_config"]["model_architecture"],
-                    snac_model=snac_model_ref,
-                )
-                if os.path.exists(before_audio_path) and os.path.getsize(before_audio_path) > 44:
-                    file_size = os.path.getsize(before_audio_path)
-                    lab.log(f"✅ Generated before-training sample: {before_audio_path} ({file_size} bytes)")
-                else:
-                    before_audio_path = None
-                    lab.log("⚠️  Before-training audio sample was empty or failed")
-            except Exception as e:
-                lab.log(f"⚠️  Could not generate before-training audio sample: {e}")
-                before_audio_path = None
+            # We will generate 4 audio samples total:
+            # 1. default_sample_text - before training
+            # 2. dataset_sample_text - before training (if available)
+            # 3. default_sample_text - after training
+            # 4. dataset_sample_text - after training (if available)
+            
+            # Build list of (text, filename_prefix) pairs
+            sample_texts = [("default", default_sample_text)]
+            if dataset_sample_text:
+                sample_texts.append(("dataset", dataset_sample_text))
+            
+            # Get the SNAC model from the trainer if it's an Orpheus model
+            snac_model_ref = getattr(model_trainer, 'snac_model', None)
+            
+            # Generate "before training" audio samples BEFORE training starts
+            lab.log("📊 Generating before-training audio samples...")
+            before_audio_paths = {}
+            for label, text_to_generate in sample_texts:
+                output_filename = f"sample_{label}_before_training.wav"
+                output_path = os.path.join(training_config["output_dir"], output_filename)
+                try:
+                    generate_audio_sample(
+                        model, tokenizer, text_to_generate,
+                        training_config["_config"]["sampling_rate"],
+                        output_path,
+                        training_config["_config"]["device"],
+                        training_config["_config"]["model_architecture"],
+                        snac_model=snac_model_ref,
+                    )
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 44:
+                        file_size = os.path.getsize(output_path)
+                        lab.log(f"✅ Generated before-training ({label}): {output_path} ({file_size} bytes)")
+                        before_audio_paths[label] = output_path
+                    else:
+                        lab.log(f"⚠️  Before-training audio ({label}) was empty or failed")
+                except Exception as e:
+                    lab.log(f"⚠️  Could not generate before-training audio ({label}): {e}")
             
             # Now run training
             trainer.train()
@@ -701,45 +721,46 @@ def train_model():
             tokenizer.save_pretrained(training_config["output_dir"])
             lab.log("✅ Model and tokenizer saved")
             
-            # Generate "after training" audio sample AFTER training completes
-            after_audio_path = os.path.join(training_config["output_dir"], "sample_after_training.wav")
-            lab.log("📊 Generating after-training audio sample...")
-            try:
-                snac_model_ref = getattr(model_trainer, 'snac_model', None)
-                
-                generate_audio_sample(
-                    model, tokenizer, sample_text,
-                    training_config["_config"]["sampling_rate"],
-                    after_audio_path,
-                    training_config["_config"]["device"],
-                    training_config["_config"]["model_architecture"],
-                    snac_model=snac_model_ref,
-                )
-                if os.path.exists(after_audio_path) and os.path.getsize(after_audio_path) > 44:
-                    file_size = os.path.getsize(after_audio_path)
-                    lab.log(f"✅ Generated after-training sample: {after_audio_path} ({file_size} bytes)")
-                else:
-                    after_audio_path = None
-                    lab.log("⚠️  After-training audio sample was empty or failed")
-            except Exception as e:
-                lab.log(f"⚠️  Could not generate after-training audio sample: {e}")
-                after_audio_path = None
+            # Generate "after training" audio samples AFTER training completes
+            lab.log("📊 Generating after-training audio samples...")
+            after_audio_paths = {}
+            for label, text_to_generate in sample_texts:
+                output_filename = f"sample_{label}_after_training.wav"
+                output_path = os.path.join(training_config["output_dir"], output_filename)
+                try:
+                    # Re-fetch snac_model_ref in case it was moved during training
+                    snac_model_ref = getattr(model_trainer, 'snac_model', None)
+                    
+                    generate_audio_sample(
+                        model, tokenizer, text_to_generate,
+                        training_config["_config"]["sampling_rate"],
+                        output_path,
+                        training_config["_config"]["device"],
+                        training_config["_config"]["model_architecture"],
+                        snac_model=snac_model_ref,
+                    )
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 44:
+                        file_size = os.path.getsize(output_path)
+                        lab.log(f"✅ Generated after-training ({label}): {output_path} ({file_size} bytes)")
+                        after_audio_paths[label] = output_path
+                    else:
+                        lab.log(f"⚠️  After-training audio ({label}) was empty or failed")
+                except Exception as e:
+                    lab.log(f"⚠️  Could not generate after-training audio ({label}): {e}")
             
-            # Save audio samples as artifacts
+            # Save all audio samples as artifacts
             try:
-                if before_audio_path and os.path.exists(before_audio_path):
-                    before_artifact_path = lab.save_artifact(
-                        before_audio_path, 
-                        "sample_before_training.wav"
-                    )
-                    lab.log(f"✅ Saved before-training audio artifact: {before_artifact_path}")
+                for label, path in before_audio_paths.items():
+                    if os.path.exists(path):
+                        artifact_name = f"sample_{label}_before_training.wav"
+                        artifact_path = lab.save_artifact(path, artifact_name)
+                        lab.log(f"✅ Saved artifact: {artifact_path}")
                 
-                if after_audio_path and os.path.exists(after_audio_path):
-                    after_artifact_path = lab.save_artifact(
-                        after_audio_path, 
-                        "sample_after_training.wav"
-                    )
-                    lab.log(f"✅ Saved after-training audio artifact: {after_artifact_path}")
+                for label, path in after_audio_paths.items():
+                    if os.path.exists(path):
+                        artifact_name = f"sample_{label}_after_training.wav"
+                        artifact_path = lab.save_artifact(path, artifact_name)
+                        lab.log(f"✅ Saved artifact: {artifact_path}")
                     
             except Exception as e:
                 lab.log(f"⚠️  Could not save audio artifacts: {e}")

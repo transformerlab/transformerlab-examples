@@ -7,114 +7,6 @@ from transformers import AutoProcessor
 from snac import SNAC
 
 
-def _patch_csm_depth_decoder_inplace(model):
-    """
-    Patch the CSM depth decoder to fix the in-place operation error on inputs_embeds.
-    
-    In Transformers 5.x, CsmDepthDecoderModel.forward() does:
-        inputs_embeds[:, 0] = backbone_last_hidden_state
-    which fails during training because inputs_embeds is a leaf variable requiring grad.
-    
-    This patch wraps the depth_decoder.model.forward to clone inputs_embeds first.
-    Must be called AFTER model loading (after FastModel.from_pretrained and get_peft_model)
-    since Unsloth may overwrite earlier patches.
-    """
-    try:
-        # Navigate to the actual depth_decoder model
-        # The model may be wrapped in PEFT, so we need to find the base model
-        base_model = model
-        while hasattr(base_model, 'model') and not isinstance(base_model, CsmForConditionalGeneration):
-            base_model = base_model.model
-        
-        # base_model should now be CsmForConditionalGeneration
-        if not hasattr(base_model, 'depth_decoder'):
-            print("⚠️  Could not find depth_decoder on model, skipping in-place fix")
-            return
-        
-        depth_decoder_model = base_model.depth_decoder.model  # CsmDepthDecoderModel
-        _original_forward = depth_decoder_model.forward.__func__ if hasattr(depth_decoder_model.forward, '__func__') else depth_decoder_model.forward
-        
-        import functools
-        import types
-        
-        @functools.wraps(_original_forward)
-        def _patched_forward(self, input_ids=None, backbone_last_hidden_state=None,
-                             attention_mask=None, position_ids=None,
-                             past_key_values=None, inputs_embeds=None,
-                             use_cache=None, **kwargs):
-            if inputs_embeds is not None:
-                inputs_embeds = inputs_embeds.clone()
-            elif input_ids is not None:
-                # Replicate the embedding logic but with a clone before in-place ops
-                from transformers.cache_utils import DynamicCache
-                from transformers.masking_utils import create_causal_mask
-                from transformers.modeling_outputs import BaseModelOutputWithPast
-                
-                if use_cache and past_key_values is None:
-                    past_key_values = DynamicCache(config=self.config)
-                
-                past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
-                inputs_seq_length = input_ids.shape[1]
-                device = input_ids.device
-                pos_ids = torch.arange(past_seen_tokens, past_seen_tokens + inputs_seq_length, device=device)
-                
-                codebook_idxs = torch.clamp(pos_ids - 1, min=0)
-                offset = codebook_idxs * self.vocab_size
-                inputs_embeds = self.embed_tokens(input_ids + offset).clone()
-                
-                if backbone_last_hidden_state is not None and pos_ids[0] == 0:
-                    inputs_embeds[:, 0] = backbone_last_hidden_state
-                
-                inputs_embeds = self.inputs_embeds_projector(inputs_embeds)
-                
-                causal_mask = create_causal_mask(
-                    config=self.config,
-                    inputs_embeds=inputs_embeds,
-                    attention_mask=attention_mask,
-                    past_key_values=past_key_values,
-                    position_ids=pos_ids,
-                )
-                
-                hidden_states = inputs_embeds
-                pos_ids = pos_ids.unsqueeze(0)
-                position_embeddings = self.rotary_emb(hidden_states, position_ids=pos_ids)
-                
-                for decoder_layer in self.layers[:self.config.num_hidden_layers]:
-                    hidden_states = decoder_layer(
-                        hidden_states,
-                        attention_mask=causal_mask,
-                        position_ids=pos_ids,
-                        past_key_values=past_key_values,
-                        use_cache=use_cache,
-                        position_embeddings=position_embeddings,
-                        **kwargs,
-                    )
-                
-                hidden_states = self.norm(hidden_states)
-                return BaseModelOutputWithPast(
-                    last_hidden_state=hidden_states,
-                    past_key_values=past_key_values if use_cache else None,
-                )
-            
-            # Fallback: neither input_ids nor inputs_embeds
-            return _original_forward(
-                self, input_ids=input_ids,
-                backbone_last_hidden_state=backbone_last_hidden_state,
-                attention_mask=attention_mask, position_ids=position_ids,
-                past_key_values=past_key_values, inputs_embeds=inputs_embeds,
-                use_cache=use_cache, **kwargs
-            )
-        
-        # Bind the patched method to the instance
-        depth_decoder_model.forward = types.MethodType(_patched_forward, depth_decoder_model)
-        print("✅ Applied post-load CSM patch: depth_decoder.model.forward (in-place fix)")
-        
-    except Exception as e:
-        print(f"⚠️  Could not apply post-load CSM depth_decoder patch: {e}")
-        import traceback
-        traceback.print_exc()
-
-
 class AudioTrainerBase(ABC):
     def __init__(
         self,
@@ -204,11 +96,6 @@ class CsmAudioTrainer(AudioTrainerBase):
             use_rslora=False,  # We support rank stabilized LoRA
             loftq_config=None,  # And LoftQ
         )
-        
-        # Apply post-load patches for Transformers 5.x compatibility
-        # Must be done AFTER FastModel.get_peft_model since Unsloth may overwrite forward methods
-        _patch_csm_depth_decoder_inplace(self.model)
-        
         num_trainable = sum(
             p.numel() for p in self.model.parameters() if p.requires_grad
         )

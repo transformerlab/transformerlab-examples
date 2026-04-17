@@ -1,0 +1,19 @@
+name: autoresearch-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: autoresearch
+resources:
+  accelerators: "RTX3090:1"
+setup: "uv pip install rustbpe tiktoken pyarrow requests torch==2.9.1 transformers huggingface_hub matplotlib numpy pandas"
+run: "python ~/autoresearch/prepare.py --num-shards 10 && python ~/autoresearch/train.py"
+envs:
+  PYTHONUNBUFFERED: \"1\"
+  HF_HUB_DISABLE_PROGRESS_BARS: \"1\"
+parameters:
+  depth: 8
+  device_batch_size: 128
+  total_batch_size: 524288
+  matrix_lr: 0.04
+  embedding_lr: 0.6
+  unembedding_lr: 0.004
+  weight_decay: 0.2
+  window_pattern: \"SSSL\"

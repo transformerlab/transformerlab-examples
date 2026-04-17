@@ -1,0 +1,12 @@
+title: Interactive Image & Video Generation
+name: image-gen-interactive
+command: python image-gen-interactive/main.py
+cpus: 2
+memory: 8
+accelerators: "RTX3090:1"
+env_vars:
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+setup: uv pip install transformerlab transformers accelerate diffusers huggingface_hub pillow moviepy gradio && uv pip install torch --index-url https://download.pytorch.org/whl/cu126
+description: Interactive image and video generation with any model (SDXL, SD, Flux, ModelScope, etc.)
+interactive: true

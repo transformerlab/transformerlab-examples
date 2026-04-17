@@ -1,7 +1,13 @@
-from unsloth import is_bfloat16_supported
+from unsloth import is_bfloat16_supported, FastLanguageModel, FastModel
 import os
 import torch
 from datetime import datetime
+import json
+import io
+import tempfile
+import librosa
+import numpy as np
+import soundfile as sf
 
 from transformers import (
     TrainingArguments,
@@ -11,6 +17,7 @@ from transformers import (
     TrainerState,
 )
 from datasets import Audio
+from snac import SNAC
 
 from trainer import CsmAudioTrainer, OrpheusAudioTrainer
 
@@ -123,6 +130,260 @@ class LabCallback(TrainerCallback):
         lab.update_progress(95)
 
 
+def _decode_orpheus_audio(generated_ids, snac_model, device="cpu"):
+    """
+    Decode Orpheus tokens back to audio using SNAC codec.
+    
+    This follows the exact logic from the Unsloth Orpheus Colab notebook:
+    1. Find the last occurrence of token 128257 (start-of-audio marker)
+    2. Crop everything after it
+    3. Remove token 128258 (end-of-speech)
+    4. Subtract 128266 offset from all tokens
+    5. Redistribute across 3 SNAC layers (7 codes per group)
+    6. Decode with SNAC
+    """
+    token_to_find = 128257   # Start of audio / SOA marker
+    token_to_remove = 128258 # End of speech
+    CODE_TOKEN_OFFSET = 128266
+    
+    try:
+        # Step 1: Find last occurrence of the start-of-audio token and crop after it
+        token_indices = (generated_ids == token_to_find).nonzero(as_tuple=True)
+        
+        if len(token_indices[1]) > 0:
+            last_occurrence_idx = token_indices[1][-1].item()
+            cropped_tensor = generated_ids[:, last_occurrence_idx + 1:]
+        else:
+            cropped_tensor = generated_ids
+        
+        # Step 2: Remove end-of-speech tokens from each row
+        processed_rows = []
+        for row in cropped_tensor:
+            masked_row = row[row != token_to_remove]
+            processed_rows.append(masked_row)
+        
+        # Step 3: Process each row into code lists
+        code_lists = []
+        for row in processed_rows:
+            row_length = row.size(0)
+            new_length = (row_length // 7) * 7
+            trimmed_row = row[:new_length]
+            # Subtract the offset to get raw SNAC codes
+            trimmed_row = [t.item() - CODE_TOKEN_OFFSET for t in trimmed_row]
+            code_lists.append(trimmed_row)
+        
+        if not code_lists or len(code_lists[0]) == 0:
+            lab.log("⚠️  No audio tokens found in generated output")
+            return None
+        
+        # Step 4: Redistribute codes across SNAC layers (matching Colab exactly)
+        def redistribute_codes(code_list):
+            layer_1 = []
+            layer_2 = []
+            layer_3 = []
+            for i in range((len(code_list) + 1) // 7):
+                layer_1.append(code_list[7 * i])
+                layer_2.append(code_list[7 * i + 1] - 4096)
+                layer_3.append(code_list[7 * i + 2] - (2 * 4096))
+                layer_3.append(code_list[7 * i + 3] - (3 * 4096))
+                layer_2.append(code_list[7 * i + 4] - (4 * 4096))
+                layer_3.append(code_list[7 * i + 5] - (5 * 4096))
+                layer_3.append(code_list[7 * i + 6] - (6 * 4096))
+            codes = [
+                torch.tensor(layer_1).unsqueeze(0),
+                torch.tensor(layer_2).unsqueeze(0),
+                torch.tensor(layer_3).unsqueeze(0),
+            ]
+            audio_hat = snac_model.decode(codes)
+            return audio_hat
+        
+        # Step 5: Decode each code list
+        my_samples = []
+        for code_list in code_lists:
+            samples = redistribute_codes(code_list)
+            my_samples.append(samples)
+        
+        # Return the first sample as numpy array
+        audio = my_samples[0].detach().squeeze().to("cpu").numpy()
+        return audio
+        
+    except Exception as e:
+        lab.log(f"⚠️  Error decoding Orpheus audio: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def generate_audio_sample(model, processor, text, sampling_rate, output_path, device="cuda", model_architecture="OrpheusForConditionalGeneration", snac_model=None):
+    """
+    Generate a synthetic audio sample from text using the trained model.
+    
+    Args:
+        model: The TTS model (already loaded)
+        processor: The model's processor/tokenizer
+        text: Text to synthesize
+        sampling_rate: Audio sampling rate
+        output_path: Path to save the audio file
+        device: Device to use (cuda or cpu)
+        model_architecture: The model architecture type
+        snac_model: Pre-loaded SNAC model (for Orpheus). If None, one will be created.
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        with torch.no_grad():
+            # Tokenize input text
+            if model_architecture == "CsmForConditionalGeneration":
+                # Enable fast inference mode (Unsloth optimization)
+                FastModel.for_inference(model)
+                
+                # CSM generation following the Unsloth Colab notebook exactly:
+                # Use processor() with "[speaker_id]text" format and output_audio=True
+                speaker_id = 0
+                inputs = processor(f"[{speaker_id}]{text}", add_special_tokens=True).to(device)
+                
+                # Generate audio directly - output_audio=True makes model return waveform
+                audio_values = model.generate(
+                    **inputs,
+                    max_new_tokens=125,  # 125 tokens = ~10 seconds of audio
+                    output_audio=True,
+                )
+                # audio_values[0] is the raw audio waveform when output_audio=True
+                audio = audio_values[0].to(torch.float32).cpu().numpy()
+                
+            else:  # OrpheusForConditionalGeneration
+                # Enable fast inference mode (Unsloth optimization)
+                FastLanguageModel.for_inference(model)
+                
+                # Initialize SNAC model for decoding (on CPU to save GPU VRAM)
+                if snac_model is None:
+                    snac_model = SNAC.from_pretrained("hubertsiuzdak/snac_24khz")
+                snac_model = snac_model.to("cpu")
+                
+                # Build Orpheus-style prompt with special tokens
+                # Format: [SOH] [text_tokens] [EOT] [EOH]
+                # SOH = 128259 (start_of_human)
+                # EOT = 128009 (end_of_text)  
+                # EOH = 128260 (end_of_human)
+                # PAD = 128263
+                start_token = torch.tensor([[128259]], dtype=torch.int64)
+                end_tokens = torch.tensor([[128009, 128260]], dtype=torch.int64)
+                
+                input_ids = processor(text, return_tensors="pt").input_ids
+                modified_input_ids = torch.cat([start_token, input_ids, end_tokens], dim=1)
+                
+                # No padding needed for single prompt
+                input_ids_device = modified_input_ids.to(device)
+                attention_mask = torch.ones_like(input_ids_device)
+                
+                # Generate audio tokens
+                generated_ids = model.generate(
+                    input_ids=input_ids_device,
+                    attention_mask=attention_mask,
+                    max_new_tokens=1200,
+                    do_sample=True,
+                    temperature=0.6,
+                    top_p=0.95,
+                    repetition_penalty=1.1,
+                    num_return_sequences=1,
+                    eos_token_id=128258,
+                    use_cache=True,
+                )
+                
+                # Decode generated tokens to audio using the Colab's exact approach
+                audio = _decode_orpheus_audio(generated_ids, snac_model, "cpu")
+                if audio is None:
+                    lab.log(f"⚠️  Failed to decode Orpheus audio")
+                    return False
+            
+            # Normalize audio
+            max_val = np.max(np.abs(audio))
+            if max_val > 0:
+                audio = audio / (max_val * 1.1)  # Add slight headroom
+            
+            # Clip to valid range
+            audio = np.clip(audio, -1.0, 1.0)
+            
+            # Convert to int16 for WAV file
+            audio_int16 = np.int16(audio * 32767)
+            
+            # Save as WAV file
+            sf.write(output_path, audio_int16, sampling_rate)
+            
+            # Verify file was created and has content
+            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                return True
+            else:
+                lab.log(f"⚠️  Generated audio file is empty: {output_path}")
+                return False
+                
+    except Exception as e:
+        lab.log(f"⚠️  Error generating audio sample: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def save_audio_samples(model_before, processor_before, model_after, processor_after, 
+                       text_sample, sampling_rate, output_dir, device="cuda", model_architecture="OrpheusForConditionalGeneration",
+                       snac_model=None):
+    """
+    Generate and save before/after training audio samples.
+    
+    Args:
+        model_before: Pre-trained model (before training)
+        processor_before: Pre-trained model's processor
+        model_after: Fine-tuned model (after training)
+        processor_after: Fine-tuned model's processor
+        text_sample: Sample text to synthesize
+        sampling_rate: Audio sampling rate
+        output_dir: Directory to save samples
+        device: Device to use
+        model_architecture: The model architecture type
+        snac_model: Pre-loaded SNAC model (shared across calls to avoid reloading)
+    
+    Returns:
+        Tuple of (before_audio_path, after_audio_path) or (None, None) if failed
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    before_audio_path = os.path.join(output_dir, "sample_before_training.wav")
+    after_audio_path = os.path.join(output_dir, "sample_after_training.wav")
+    
+    lab.log(f"🎵 Generating audio samples with text: '{text_sample}'...")
+    
+    # Generate before training sample
+    lab.log("Generating pre-trained model sample...")
+    before_success = generate_audio_sample(
+        model_before, processor_before, text_sample, 
+        sampling_rate, before_audio_path, device, model_architecture,
+        snac_model=snac_model
+    )
+    
+    if before_success:
+        file_size = os.path.getsize(before_audio_path)
+        lab.log(f"✅ Generated before-training sample: {before_audio_path} ({file_size} bytes)")
+    else:
+        before_audio_path = None
+    
+    # Generate after training sample
+    lab.log("Generating fine-tuned model sample...")
+    after_success = generate_audio_sample(
+        model_after, processor_after, text_sample, 
+        sampling_rate, after_audio_path, device, model_architecture,
+        snac_model=snac_model
+    )
+    
+    if after_success:
+        file_size = os.path.getsize(after_audio_path)
+        lab.log(f"✅ Generated after-training sample: {after_audio_path} ({file_size} bytes)")
+    else:
+        after_audio_path = None
+    
+    return before_audio_path, after_audio_path
+
+
 def train_model():
     """Train an audio model using unsloth."""
 
@@ -136,26 +397,26 @@ def train_model():
         # Get parameters from task configuration
         config = lab.get_config()
 
-        # Extract parameters with defaults
+        # Extract parameters with defaults and ensure proper types
         model_name = config.get("model_name", "unsloth/orpheus-3b-0.1-ft")
         dataset = config.get("dataset", "bosonai/EmergentTTS-Eval")
         audio_column_name = config.get("audio_column_name", "audio")
         text_column_name = config.get("text_column_name", "text_to_synthesize")
-        lora_alpha = config.get("lora_alpha", 32)
-        lora_dropout = config.get("lora_dropout", 0.0)
-        lora_r = config.get("lora_r", 16)
-        maximum_sequence_length = config.get("maximum_sequence_length", 1024)
-        max_grad_norm = config.get("max_grad_norm", 0.3)
-        learning_rate = config.get("learning_rate", 5e-05)
+        lora_alpha = int(config.get("lora_alpha", 32))
+        lora_dropout = float(config.get("lora_dropout", 0.0))
+        lora_r = int(config.get("lora_r", 16))
+        maximum_sequence_length = int(config.get("maximum_sequence_length", 1024))
+        max_grad_norm = float(config.get("max_grad_norm", 0.3))
+        learning_rate = float(config.get("learning_rate", 5e-05))
         learning_rate_schedule = config.get("learning_rate_schedule", "linear")
-        batch_size = config.get("batch_size", 1)
-        num_train_epochs = config.get("num_train_epochs", 1)
-        weight_decay = config.get("weight_decay", 0.0)
-        adam_beta1 = config.get("adam_beta1", 0.9)
-        adam_beta2 = config.get("adam_beta2", 0.999)
-        adam_epsilon = config.get("adam_epsilon", 1e-08)
-        sampling_rate = config.get("sampling_rate", 24000)
-        max_steps = config.get("max_steps", -1)
+        batch_size = int(config.get("batch_size", 1))
+        num_train_epochs = float(config.get("num_train_epochs", 1))
+        weight_decay = float(config.get("weight_decay", 0.0))
+        adam_beta1 = float(config.get("adam_beta1", 0.9))
+        adam_beta2 = float(config.get("adam_beta2", 0.999))
+        adam_epsilon = float(config.get("adam_epsilon", 1e-08))
+        sampling_rate = int(config.get("sampling_rate", 24000))
+        max_steps = int(config.get("max_steps", -1))
         model_architecture = config.get("model_architecture", "OrpheusForConditionalGeneration")
 
         # Training configuration
@@ -383,6 +644,7 @@ def train_model():
                     report_to="wandb" if training_config.get("log_to_wandb", True) else "none",
                     output_dir=training_config["output_dir"],
                     resume_from_checkpoint=checkpoint if checkpoint else None,
+                    remove_unused_columns=False,
                 ),
             )
             lab.log("Trainer setup complete.")
@@ -398,6 +660,58 @@ def train_model():
         # Train the model
         lab.log("Starting training...")
         try:
+            # Define both sample texts for audio generation
+            default_sample_text = "Hello welcome to transformer lab, where we turn text into natural sounding speech"
+            dataset_sample_text = None
+            
+            if len(dataset) > 0:
+                try:
+                    sample_data = dataset[0]
+                    if training_config["_config"]["text_column_name"] in sample_data:
+                        dataset_sample_text = sample_data[training_config["_config"]["text_column_name"]]
+                        lab.log(f"Using dataset sample text: '{dataset_sample_text}'")
+                except Exception:
+                    lab.log("Could not extract dataset sample text")
+            
+            # We will generate 4 audio samples total:
+            # 1. default_sample_text - before training
+            # 2. dataset_sample_text - before training (if available)
+            # 3. default_sample_text - after training
+            # 4. dataset_sample_text - after training (if available)
+            
+            # Build list of (text, filename_prefix) pairs
+            sample_texts = [("default", default_sample_text)]
+            if dataset_sample_text:
+                sample_texts.append(("dataset", dataset_sample_text))
+            
+            # Get the SNAC model from the trainer if it's an Orpheus model
+            snac_model_ref = getattr(model_trainer, 'snac_model', None)
+            
+            # Generate "before training" audio samples BEFORE training starts
+            lab.log("📊 Generating before-training audio samples...")
+            before_audio_paths = {}
+            for label, text_to_generate in sample_texts:
+                output_filename = f"sample_{label}_before_training.wav"
+                output_path = os.path.join(training_config["output_dir"], output_filename)
+                try:
+                    generate_audio_sample(
+                        model, tokenizer, text_to_generate,
+                        training_config["_config"]["sampling_rate"],
+                        output_path,
+                        training_config["_config"]["device"],
+                        training_config["_config"]["model_architecture"],
+                        snac_model=snac_model_ref,
+                    )
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 44:
+                        file_size = os.path.getsize(output_path)
+                        lab.log(f"✅ Generated before-training ({label}): {output_path} ({file_size} bytes)")
+                        before_audio_paths[label] = output_path
+                    else:
+                        lab.log(f"⚠️  Before-training audio ({label}) was empty or failed")
+                except Exception as e:
+                    lab.log(f"⚠️  Could not generate before-training audio ({label}): {e}")
+            
+            # Now run training
             trainer.train()
             lab.log("✅ Training completed successfully")
 
@@ -406,12 +720,57 @@ def train_model():
             model.save_pretrained(training_config["output_dir"])
             tokenizer.save_pretrained(training_config["output_dir"])
             lab.log("✅ Model and tokenizer saved")
+            
+            # Generate "after training" audio samples AFTER training completes
+            lab.log("📊 Generating after-training audio samples...")
+            after_audio_paths = {}
+            for label, text_to_generate in sample_texts:
+                output_filename = f"sample_{label}_after_training.wav"
+                output_path = os.path.join(training_config["output_dir"], output_filename)
+                try:
+                    # Re-fetch snac_model_ref in case it was moved during training
+                    snac_model_ref = getattr(model_trainer, 'snac_model', None)
+                    
+                    generate_audio_sample(
+                        model, tokenizer, text_to_generate,
+                        training_config["_config"]["sampling_rate"],
+                        output_path,
+                        training_config["_config"]["device"],
+                        training_config["_config"]["model_architecture"],
+                        snac_model=snac_model_ref,
+                    )
+                    if os.path.exists(output_path) and os.path.getsize(output_path) > 44:
+                        file_size = os.path.getsize(output_path)
+                        lab.log(f"✅ Generated after-training ({label}): {output_path} ({file_size} bytes)")
+                        after_audio_paths[label] = output_path
+                    else:
+                        lab.log(f"⚠️  After-training audio ({label}) was empty or failed")
+                except Exception as e:
+                    lab.log(f"⚠️  Could not generate after-training audio ({label}): {e}")
+            
+            # Save all audio samples as artifacts
+            try:
+                for label, path in before_audio_paths.items():
+                    if os.path.exists(path):
+                        artifact_name = f"sample_{label}_before_training.wav"
+                        artifact_path = lab.save_artifact(path, artifact_name)
+                        lab.log(f"✅ Saved artifact: {artifact_path}")
+                
+                for label, path in after_audio_paths.items():
+                    if os.path.exists(path):
+                        artifact_name = f"sample_{label}_after_training.wav"
+                        artifact_path = lab.save_artifact(path, artifact_name)
+                        lab.log(f"✅ Saved artifact: {artifact_path}")
+                    
+            except Exception as e:
+                lab.log(f"⚠️  Could not save audio artifacts: {e}")
+                import traceback
+                traceback.print_exc()
 
             # Create training summary artifact
             progress_file = os.path.join(
                 training_config["output_dir"], "training_summary.json"
             )
-            import json
 
             with open(progress_file, "w") as f:
                 json.dump(

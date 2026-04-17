@@ -1,0 +1,24 @@
+name: comfy-ui
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: interactive-comfyui
+resources:
+  cpus: 2
+  memory: 8
+setup: |
+  detect_accel(){ if [ "$(uname -s)" = "Darwin" ]; then echo "m-series"; return; fi; if command -v nvidia-smi >/dev/null 2>&1; then echo "nvidia"; return; fi; if command -v rocminfo >/dev/null 2>&1; then echo "amd"; return; fi; echo "cpu"; }
+  ACCEL=$(detect_accel)
+  pip install -q --upgrade pip
+  if [ "$ACCEL" = "nvidia" ]; then
+    pip install torch torchvision torchaudio
+  elif [ "$ACCEL" = "amd" ]; then
+    pip install -q --index-url https://download.pytorch.org/whl/rocm6.4 torch torchvision torchaudio
+  else
+    pip install -q torch torchvision torchaudio
+  fi
+  pip install comfy-cli
+  yes | comfy install --$ACCEL
+run: |
+  python ~/interactive-comfyui/run.py
+envs:
+  PYTHONUNBUFFERED: "1"
+parameters:

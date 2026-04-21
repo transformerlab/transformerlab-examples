@@ -9,6 +9,8 @@ import sys
 import time
 import urllib.request
 import urllib.error
+from lab import lab
+
 
 LOG_FILES = [
     pathlib.Path("/tmp/vllm.log"),
@@ -121,6 +123,12 @@ def main() -> None:
     model_name = os.environ.get("MODEL_NAME", "meta-llama/Llama-2-7b-chat-hf")
     tp_size = os.environ.get("TP_SIZE", "1")
     env = os.environ.copy()
+
+    # If a TLab registry model was selected, download it and use the local path.
+    if os.environ.get("MODEL_REGISTRY_TLAB") == "1":
+        print(f"Downloading registry model '{model_name}'...", flush=True)
+        model_name = lab.download_registry_model(model_name)
+        print(f"Model downloaded to: {model_name}", flush=True)
 
     _touch_logs()
 

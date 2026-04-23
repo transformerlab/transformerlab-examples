@@ -1,0 +1,46 @@
+name: hunyuan3d-2
+resources:
+  cpus: 4
+  memory: 16
+  accelerators: "RTX4090:1"
+setup: >-
+  cd ~/hunyuan3d-2 &&
+  git clone https://github.com/Tencent-Hunyuan/Hunyuan3D-2.1.git Hunyuan3D-2.1 &&
+  cd Hunyuan3D-2.1 &&
+  pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124 &&
+  pip install -r requirements.txt &&
+  cd hy3dpaint/custom_rasterizer &&
+  pip install -e . &&
+  cd ../../DifferentiableRenderer &&
+  bash compile_mesh_painter.sh &&
+  cd ../.. &&
+  wget https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth -P hy3dpaint/ckpt
+run: "python ~/hunyuan3d-2/main.py"
+envs:
+  PYTHONUNBUFFERED: "1"
+  HF_API_TOKEN: "{{secret._HF_TOKEN}}"
+parameters:
+  mode:
+    type: enum
+    default: image2text
+    options:
+      - image2text
+    title: Generation Mode
+    description: Generate a 3D asset from an input image. Text-to-3D is not implemented in this script yet.
+  input:
+    type: string
+    default: ""
+    ui_widget: file
+    title: Input Image
+  output:
+    type: string
+    default: ./output
+    title: Output Directory
+  model_path:
+    type: string
+    default: tencent/Hunyuan3D-2.1
+    title: Model Path
+  low_vram_mode:
+    type: bool
+    default: false
+    title: Low VRAM Mode
